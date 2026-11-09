@@ -8,7 +8,7 @@
 产出（与本脚本同目录）:
     qr.png         局域网二维码（http://<IP>:<端口>/），本机起服务时给同 Wi-Fi 的手机扫
     qr.html        局域网扫码展示页（图片内嵌 base64，双击就能看，不依赖服务器）
-    qr-online.png  线上二维码（https://chick-games.app.workbuddy.host/），公网可扫
+    qr-online.png  线上二维码（https://jmwasky-creative.github.io/chick-games/），公网可扫
     qr-online.html 线上扫码展示页（图片内嵌 base64）
 
 hub 页底部的扫码区引用 qr-online.png（公网版），局域网那份留着本地服务时用。
@@ -23,7 +23,7 @@ import sys
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # 云上应用地址（sites 发布后的分享链接）；改域名后重跑本脚本刷新 qr-online.png
-ONLINE_URL = "https://chick-games.app.workbuddy.host/"
+ONLINE_URL = "https://jmwasky-creative.github.io/chick-games/"
 
 
 def lan_ip():
