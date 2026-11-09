@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>小鸡太空飞碟</title>
+<style>
+/* iOS 安全区变量：供 CSS 内边距使用 */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  position:fixed; width:100%; height:100%; overflow:hidden;
+  background:#0b1026;
+  display:flex; justify-content:center; align-items:center;
+  touch-action:none; overscroll-behavior:none;
+  -webkit-user-select:none; user-select:none;
+  -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;
+  /* 只用系统字体栈：Comic Sans 在 iPad/iPhone 上不存在，会退化成衬线体 */
+  font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",
+              -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+#gameWrapper {
+  position:relative;
+  aspect-ratio: 900 / 650;
+  width: min(100vw, calc(100vh * 900 / 650));
+  height: auto;
+  max-width:calc(100vw - var(--sal) - var(--sar));
+  max-height:calc(100vh - var(--sat) - var(--sab));
+}
+canvas {
+  display:block; width:100%; height:100%;
+  border-radius:14px; box-shadow:0 0 40px rgba(120,180,255,.25);
+}
+#mobileControls {
+  display:none; position:absolute; bottom:12px; left:0; right:0;
+  padding:0 16px; pointer-events:none; z-index:10;
+}
+.dpad {
+  display:grid;
+  grid-template-areas:". up ." "left . right" ". down .";
+  gap:4px; pointer-events:auto;
+}
+.mbtn {
+  width:56px; height:56px; border-radius:50%;
+  background:rgba(255,255,255,.22); border:2px solid rgba(255,255,255,.45);
+  color:#fff; font-size:22px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; touch-action:none; -webkit-tap-highlight-color:transparent;
+}
+.mbtn:active { background:rgba(255,255,255,.55); }
+/* 触摸设备一律显示虚拟按键。
+   注意：不能只按宽度判断 —— iPad 横屏视口宽 1180~1194px，会被误判成桌面而隐藏方向键。 */
+@media (max-width:768px), (pointer:coarse) { #mobileControls { display:flex; } }
+/* 触摸设备上按键放大，方便小朋友的小手指 */
+@media (pointer:coarse) {
+  .mbtn { width:64px; height:64px; font-size:26px; }
+  #mobileControls { bottom:18px; padding:0 22px; }
+}
+@media (max-height:480px) { .mbtn { width:46px; height:46px; font-size:18px; } }
+</style>
+</head>
+<body>
+<div id="gameWrapper">
+  <canvas id="game" width="900" height="650" role="img"
+          aria-label="小鸡太空飞碟游戏画面：飞碟自动飞行，撞陨石收集零件组装飞碟"></canvas>
+  <div id="mobileControls">
+    <div class="dpad">
+      <div class="mbtn" data-key="ArrowUp"    style="grid-area:up">▲</div>
+      <div class="mbtn" data-key="ArrowLeft"  style="grid-area:left">◀</div>
+      <div class="mbtn" data-key="ArrowRight" style="grid-area:right">▶</div>
+      <div class="mbtn" data-key="ArrowDown"  style="grid-area:down">▼</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== 小鸡太空飞碟 ====================
+// 给 5-6 岁小朋友：零失败、全自动、全图形化 + 中文语音
+// ====================================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = 900, H = 650;
+
+/* ===== 渐变缓存 =====
+ * createLinearGradient / createRadialGradient 每帧 new 是很隐蔽的性能开销。
+ * 渐变坐标是「绘制时的用户坐标系」，逻辑坐标恒为 900×650，
+ * 所以缓存一次即可长期复用（DPR 交给 setTransform，不影响缓存有效性）。 */
+const _grads = Object.create(null);
+function grad(key, make){
+  let g = _grads[key];
+  if (!g){ g = make(); _grads[key] = g; }
+  return g;
+}
+
+/* 尊重系统「减少动态效果」：粒子上限减半 */
+const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// ===== 状态机（8 态）=====
+const S = { MENU:0, SLEEP:1, EXPLODE:2, BLASTOFF:3, SPACE:4, BUILD:5, FLYHOME:6, WIN:7 };
+let state = S.MENU;
+
+// ===== 五个阶段 =====
+const STAGES = [
+  { key:'hull',    name:'碟身',   need:2, meteors:2, beans:0, color:'#B0BEC5' },
+  { key:'engine',  name:'引擎',   need:3, meteors:3, beans:1, color:'#FF7043' },
+  { key:'dome',    name:'玻璃罩', need:3, meteors:4, beans:1, color:'#4DD0E1' },
+  { key:'antenna', name:'天线',   need:3, meteors:5, beans:1, color:'#FFD54F' },
+  { key:'fuel',    name:'燃料',   need:3, meteors:6, beans:2, color:'#26C6DA' }
+];
+const PART_TYPES = ['hull','engine','dome','antenna','fuel'];
+
+// ===== 难度：怪物数量 / 冲刺速度 / 陨石数量 =====
+const DIFFS = [
+  { name:'悠闲', stars:'⭐',     beans:1, meteors:1, spd:2.2, cd0:300, cd1:380 },
+  { name:'普通', stars:'⭐⭐',   beans:2, meteors:3, spd:3.0, cd0:190, cd1:260 },
+  { name:'热闹', stars:'⭐⭐⭐', beans:4, meteors:5, spd:3.8, cd0:120, cd1:180 }
+];
+let diff = 1;              // 默认「普通」
+let diffCards = [];        // 难度卡片位置（给点击判定用）
+
+// ===== 物理手感 =====
+const ACC = 0.5, MAXV = 4.6, DAMP = 0.960;
+const MARGIN = 42, WALLK = 0.014;
+const PICK_R = 48, MAGNET_R = 70;      // 收集判定 / 磁吸半径
+const HUD_H = 58;                       // 顶部 HUD 高度
+const SAFE_BOTTOM = 105;                // 移动端虚拟按键遮挡区（零件不生成在这）
+const IDLE_LIMIT = 480;                 // 8 秒无进展 → 送零件
+
+// ===== 过场计时器（所有过场共用）=====
+const cs = { t:0, T:0 };
+function enterCutscene(next, frames){ cs.t = 0; cs.T = frames; state = next; }
+function csP(){ return cs.T ? clp(cs.t / cs.T, 0, 1) : 1; }
+
+// ===== 全局状态 =====
+let stage = 0, partGot = 0;
+let parts = [], meteors = [], beans = [], stars = [], decoParts = [];
+let particles = [], trail = [], floaters = [];
+let frame = 0, shake = 0, menuT = 0, idleT = 0;
+let msg = '', msgT = 0;
+let partsDone = false, padNear = false;
+let boomed = false;
+let dotPop = [];
+
+// 小鸡
+const ck = {
+  x: W/2, y: H/2, s: 20, vx:0, vy:0, dir:0, wf:0, bob:0,
+  rot:0, rv:0.008, stun:0, inv:0, asleep:false, helmet:true
+};
+
+// 组装台
+const pad = { x: W/2, y: H/2 + 60, glow:0 };
+
+// 飞碟部件完成标记
+let built = [false, false, false, false, false];
+
+// ===== 工具 =====
+function rand(a,b){ return Math.random()*(b-a)+a; }
+function dst(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+function clp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function easeOut(t){ return 1 - (1-t)*(1-t); }
+function popup(t, d=90){ msg = t; msgT = d; }
+/* 粒子上限：减少动态效果模式下再砍一半 */
+const P_MAX = REDUCED ? 70 : 220;
+function pushP(p){ if (particles.length < P_MAX) particles.push(p); }
+function rrect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function burst(x, y, n, colors, spd=4, life=34){
+  for (let i=0;i<n;i++){
+    const a = rand(0, Math.PI*2), v = rand(0.3,1)*spd;
+    pushP({ x, y, vx:Math.cos(a)*v, vy:Math.sin(a)*v, life:rand(life*0.6,life),
+            clr:colors[i%colors.length], s:rand(3,7) });
+  }
+}
+
+// ===== 输入 =====
+const keys = {};
+function unlockAV(){
+  // AudioContext 与语音都必须在真实用户手势内解锁
+  ia();
+  if (ac && ac.state === 'suspended') { try { ac.resume(); } catch(e){} }
+  if (!voiceReady) { voiceReady = true; }
+}
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  unlockAV();
+  if (e.key === 'Enter') {
+    if (state === S.MENU) startGame();
+    else if (state === S.WIN){ state = S.MENU; menuT = 0; }
+    else if (state === S.SLEEP) enterCutscene(S.EXPLODE, 130);
+  }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// 虚拟方向键（含 touchcancel，防手指滑出卡键）
+document.querySelectorAll('.mbtn[data-key]').forEach(b => {
+  const k = b.dataset.key;
+  const on  = e => { e.preventDefault(); unlockAV(); keys[k] = true; };
+  const off = e => { e.preventDefault(); keys[k] = false; };
+  b.addEventListener('touchstart',  on,  {passive:false});
+  b.addEventListener('touchend',    off, {passive:false});
+  b.addEventListener('touchcancel', off, {passive:false});
+  b.addEventListener('mousedown',   on);
+  b.addEventListener('mouseup',     off);
+  b.addEventListener('mouseleave',  off);
+});
+
+// 兜底：只要是可触摸设备，就强制显示虚拟按键。
+// 不能只靠 CSS @media —— iPad 横屏视口宽 1180px 会被当成桌面机，方向键会被隐藏。
+(function(){
+  const touch = ('ontouchstart' in window) ||
+                (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
+  if (touch){
+    const mc = document.getElementById('mobileControls');
+    if (mc) mc.style.display = 'flex';
+  }
+})();
+
+// 点画面：开始 / 跳过 / 语音开关 / 指哪飞哪
+let tapTarget = null;
+canvas.addEventListener('pointerdown', e => {
+  unlockAV();
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width  * W;
+  const y = (e.clientY - r.top)  / r.height * H;
+  // 语音开关（右上角）
+  if (Math.hypot(x - (W-34), y - 30) < 22) {
+    voiceOn = !voiceOn;
+    if (!voiceOn && window.speechSynthesis) { try { speechSynthesis.cancel(); } catch(err){} }
+    return;
+  }
+  if (state === S.MENU){
+    for (const c of diffCards){
+      if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h){
+        diff = c.idx; startGame(); return;
+      }
+    }
+    startGame();   // 点在卡片外面：用当前难度直接开始
+  }
+  else if (state === S.SLEEP) enterCutscene(S.EXPLODE, 130);
+  else if (state === S.WIN){ state = S.MENU; menuT = 0; }   // 回菜单，可以重选难度
+  else if (state === S.SPACE && !partsDone) tapTarget = { x, y };   // 按住画面，小鸡就飞过去
+});
+// 手指抬起就停（挂在 window 上，防止手指滑出画布后卡住不停）
+['pointerup','pointercancel'].forEach(ev =>
+  window.addEventListener(ev, () => { tapTarget = null; }));
+
+// 禁 iOS 双指缩放 / 双击缩放
+['gesturestart','gesturechange','dblclick'].forEach(ev =>
+  document.addEventListener(ev, e => e.preventDefault(), {passive:false}));
+
+// ===== 音效（Web Audio 合成）=====
+let ac = null;
+function ia(){ if (!ac) { try { ac = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} } }
+function snd(f, d, ty='sine', v=0.12){
+  if (!ac) return;
+  try {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = ty; o.frequency.value = f;
+    g.gain.setValueAtTime(v, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + d);
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + d);
+  } catch(e){}
+}
+function seq(notes, gap=90, ty='sine', v=0.12){
+  notes.forEach((f,i) => setTimeout(() => snd(f, 0.18, ty, v), i*gap));
+}
+const sPickup = () => seq([880, 1200], 70, 'square', 0.10);
+const sBump   = () => { snd(160,0.22,'sawtooth',0.14); setTimeout(()=>snd(110,0.28,'sawtooth',0.11), 90); };
+const sClick  = () => snd(660, 0.08, 'triangle', 0.12);
+const sBuild  = () => { snd(520,0.1,'triangle',0.13); setTimeout(()=>snd(780,0.14,'triangle',0.13),110); };
+const sLaunch = () => seq([392,523,659,784], 110, 'sine', 0.13);
+const sWin    = () => seq([523,659,784,1047], 130, 'sine', 0.14);
+const sBoom   = () => { snd(90,0.5,'sawtooth',0.20); for(let i=0;i<5;i++) setTimeout(()=>snd(rand(120,400),0.1,'square',0.06), i*40); };
+
+// ===== 语音（speechSynthesis，中文）=====
+let voiceOn = true, voiceReady = false, zhVoice = null, voiceTries = 0;
+let lastSayText = '', lastSayTime = 0;
+const DEDUPE_MS = 8000;
+
+function pickZhVoice(){
+  if (!window.speechSynthesis) return null;
+  const vs = speechSynthesis.getVoices() || [];
+  return vs.find(v => /zh[-_]CN/i.test(v.lang)) || vs.find(v => /^zh/i.test(v.lang)) || null;
+}
+function initVoices(){
+  if (!window.speechSynthesis) { voiceOn = false; return; }
+  zhVoice = pickZhVoice();
+  // iOS Safari 上 getVoices() 首次常返回空且不一定触发 onvoiceschanged → 轮询 3 秒兜底
+  if (!zhVoice && voiceTries++ < 30) setTimeout(initVoices, 100);
+  // 3 秒后仍无中文音色 → 默认关闭，宁可不出声也不读成怪音
+  if (voiceTries >= 30 && !zhVoice) voiceOn = false;
+}
+if (window.speechSynthesis) {
+  initVoices();
+  try { speechSynthesis.onvoiceschanged = initVoices; } catch(e){}
+}
+
+function say(text, force){
+  if (!voiceOn || !voiceReady || !text) return;
+  if (!window.speechSynthesis || !zhVoice) return;
+  const now = (window.performance && performance.now) ? performance.now() : Date.now();
+  if (!force && text === lastSayText && now - lastSayTime < DEDUPE_MS) return;
+  lastSayText = text; lastSayTime = now;
+  try {
+    // 只在强制句打断，规避 iOS 高频 cancel 导致的静默 bug
+    if (force) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN'; u.rate = 0.85; u.pitch = 1.15; u.volume = 0.9;
+    u.voice = zhVoice;
+    u.onend = u.onerror = function(){};
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+
+// 切后台回前台：语音与音频都要 resume，否则永久静默
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (window.speechSynthesis) { try { speechSynthesis.resume(); } catch(e){} }
+  if (ac && ac.state === 'suspended') { try { ac.resume(); } catch(e){} }
+});
+
+// ===== 数据生成 =====
+function resetStars(){
+  stars = [];
+  for (let i=0;i<90;i++) stars.push({ x:rand(0,W), y:rand(0,H), r:rand(0.6,2.1), tw:rand(0,6.28) });
+}
+
+function newPart(type, far){
+  let x, y, tries = 0;
+  do {
+    x = rand(70, W-70);
+    y = rand(HUD_H + 40, H - SAFE_BOTTOM);
+    tries++;
+  } while (tries < 30 && (dst({x,y}, pad) < 90 || (!far && dst({x,y}, ck) < 140)));
+  return {
+    x, y, type, vx:rand(-0.4,0.4), vy:rand(-0.4,0.4),
+    rot:rand(0,6.28), rv:rand(-0.025,0.025), bounce:rand(0,6.28), got:false
+  };
+}
+
+function ensureParts(){
+  const st = STAGES[stage];
+  const want = (st.need - partGot) + 2;   // 永远富余 2 个，孩子再怎么撞都够用
+  let guard = 0;
+  while (parts.length < want && guard++ < 20) parts.push(newPart(st.key, false));
+}
+
+function genDeco(){
+  // 远景零件剪影：兑现"外太空到处都是飞碟的材料"，不可收集，纯氛围
+  decoParts = [];
+  for (let i=0;i<12;i++){
+    decoParts.push({
+      x:rand(0,W), y:rand(HUD_H+10, H-SAFE_BOTTOM),
+      type:PART_TYPES[i % 5], s:rand(7,14), rot:rand(0,6.28), rv:rand(-0.012,0.012),
+      vx:rand(-0.25,0.25), vy:rand(-0.15,0.15), a:rand(0.07,0.16)
+    });
+  }
+}
+
+function genMeteors(n){
+  meteors = [];
+  for (let i=0;i<n;i++){
+    let x, y, tries = 0;
+    do { x = rand(60, W-60); y = rand(HUD_H+40, H-SAFE_BOTTOM); tries++; }
+    while (tries < 30 && dst({x,y}, ck) < 170);
+    const r = rand(18,32);
+    const shape = [];
+    for (let k=0;k<8;k++) shape.push(r * rand(0.75, 1.15));
+    meteors.push({ x, y, r, shape, vx:rand(-0.6,0.6), vy:rand(-0.6,0.6),
+                   rot:rand(0,6.28), rv:rand(-0.02,0.02) });
+  }
+}
+
+function genBeans(n){
+  beans = [];
+  for (let i=0;i<n;i++){
+    let x, y, tries = 0;
+    do { x = rand(70, W-70); y = rand(HUD_H+40, H-SAFE_BOTTOM); tries++; }
+    while (tries < 30 && dst({x,y}, ck) < 200);
+    // 多只怪物：初始冷却错开，避免它们同时冲过来
+    beans.push({ x, y, r:16, cd:rand(120,260) + i * 80, dash:0, dx:0, dy:0, wob:rand(0,6.28) });
+  }
+}
+
+// ===== 阶段流程 =====
+function startGame(){
+  stage = 0; partGot = 0; built = [false,false,false,false,false];
+  particles = []; trail = []; floaters = []; dotPop = [];
+  partsDone = false; padNear = false; idleT = 0; boomed = false;
+  resetStars();
+  say('小鸡太空大冒险', true);
+  enterCutscene(S.SLEEP, 180);
+}
+
+function initStage(n){
+  stage = n; partGot = 0;
+  parts = []; meteors = []; beans = []; dotPop = [];
+  partsDone = false; padNear = false; idleT = 0; tapTarget = null;
+  const st = STAGES[n];
+  ck.x = W/2; ck.y = H - 170; ck.vx = 0; ck.vy = 0; ck.rot = 0; ck.rv = 0.008;
+  ck.stun = 0; ck.inv = 60; ck.asleep = false; ck.helmet = true;
+  ensureParts();
+  genDeco();
+  genMeteors(Math.min(DIFFS[diff].meteors + stage, 9));
+  genBeans(DIFFS[diff].beans + Math.floor(stage / 2));
+  state = S.SPACE;
+  popup('找' + st.name + '！');
+  say('找' + st.name + '！', true);
+}
+
+function startBuild(){
+  enterCutscene(S.BUILD, 100);
+  say('开始拼飞碟！', true);
+}
+
+function nextStageOrHome(){
+  if (stage < STAGES.length - 1) initStage(stage + 1);
+  else {
+    enterCutscene(S.FLYHOME, 210);
+    say('飞碟做好啦！出发回家！', true);
+  }
+}
+
+// ===== 碰撞与零失败 =====
+// 撞击：完全不惩罚，纯搞笑反馈。不掉零件、不扣命、不结束。
+function bump(fromX, fromY, power){
+  if (ck.inv > 0) return;
+  ck.inv = 45;              // 无敌闪烁
+  ck.stun = 30;             // 失控打转
+  const a = Math.atan2(ck.y - fromY, ck.x - fromX);
+  ck.vx = Math.cos(a) * 11 * power;
+  ck.vy = Math.sin(a) * 11 * power;
+  ck.rv = 0.26 * power;
+  shake = 12 * power;
+  sBump();
+  burst(ck.x, ck.y, 12, ['#FFF59D','#FFE082','#FFFFFF'], 4, 30);
+  floaters.push({ x:ck.x, y:ck.y-30, txt:'💫', life:50 });
+  say('哎呀，转个圈！', false);
+}
+
+function checkCollect(){
+  const st = STAGES[stage];
+  for (let i=parts.length-1; i>=0; i--){
+    const p = parts[i];
+    const d = dst(p, ck);
+    // 磁吸：靠近就被吸过来，孩子不用精确对准
+    if (d < MAGNET_R && d > 1){
+      const a = Math.atan2(ck.y - p.y, ck.x - p.x);
+      const pull = (1 - d / MAGNET_R) * 1.5;
+      p.vx += Math.cos(a) * pull; p.vy += Math.sin(a) * pull;
+    }
+    if (d < PICK_R){
+      parts.splice(i, 1);
+      partGot++;
+      dotPop[partGot-1] = 18;
+      idleT = 0;
+      sPickup();
+      burst(p.x, p.y, 14, ['#FFD54F','#FFF59D','#FFFFFF'], 3.5, 28);
+      floaters.push({ x:p.x, y:p.y, txt:'⭐', life:40 });
+      if (partGot >= st.need){
+        partsDone = true;
+        popup('齐啦！飞回中间！');
+        say('零件齐啦！自己飞回中间的小台子！', true);
+      }
+    }
+  }
+}
+
+function checkMeteors(){
+  for (const m of meteors){
+    if (dst(m, ck) < m.r + ck.s * 0.8) { bump(m.x, m.y, 1.0); break; }
+  }
+}
+
+function checkBeans(){
+  for (const b of beans){
+    if (dst(b, ck) < b.r + ck.s * 0.8) { bump(b.x, b.y, 1.4); break; }
+  }
+}
+
+// 终极兜底：8 秒没进展，最近的零件主动飞过来找小鸡
+function antiStuck(){
+  idleT++;
+  // 零件齐了但孩子还没往中间飞：隔一会儿再提醒一次，仍然让他自己操作
+  if (partsDone){
+    if (idleT > IDLE_LIMIT){ idleT = 0; say('飞回中间的小台子！', true); }
+    return;
+  }
+  if (idleT > IDLE_LIMIT && parts.length > 0){
+    idleT = 0;
+    let best = null, bd = 1e9;
+    for (const p of parts){ const d = dst(p, ck); if (d < bd){ bd = d; best = p; } }
+    if (best){
+      best.help = 300;                    // 5 秒求助状态：持续朝小鸡飞，且不被阻尼吃掉
+      burst(best.x, best.y, 10, ['#FFD54F','#FFFFFF'], 3, 26);
+      floaters.push({ x:best.x, y:best.y, txt:'🌟', life:50 });
+      snd(700, 0.12, 'sine', 0.1); setTimeout(()=>snd(1000, 0.18, 'sine', 0.1), 90);
+    }
+  }
+}
+
+// ===== 更新：小鸡 =====
+function moveChick(){
+  let mx = 0, my = 0;
+  if (keys.ArrowUp    || keys.w || keys.W) my -= 1;
+  if (keys.ArrowDown  || keys.s || keys.S) my += 1;
+  if (keys.ArrowLeft  || keys.a || keys.A) mx -= 1;
+  if (keys.ArrowRight || keys.d || keys.D) mx += 1;
+
+  // 集齐后自动驾驶：小鸡自己飘向组装台，孩子不用操作
+  if (ck.stun > 0){
+    ck.stun--;
+  } else if (tapTarget){
+    // 指哪飞哪：按住画面某处，小鸡朝那里飘过去（对小朋友比方向键更容易）
+    const dx = tapTarget.x - ck.x, dy = tapTarget.y - ck.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 18) tapTarget = null;
+    else { ck.vx += dx/d * ACC; ck.vy += dy/d * ACC; }
+  } else {
+    if (mx && my){ mx *= 0.707; my *= 0.707; }
+    ck.vx += mx * ACC; ck.vy += my * ACC;
+  }
+
+  ck.vx *= DAMP; ck.vy *= DAMP;
+  const sp = Math.hypot(ck.vx, ck.vy);
+  if (sp > MAXV){ ck.vx = ck.vx / sp * MAXV; ck.vy = ck.vy / sp * MAXV; }
+  ck.x += ck.vx; ck.y += ck.vy;
+
+  // 软墙：越界越深回推越强，永不卡住
+  if (ck.x < MARGIN)        ck.vx += (MARGIN - ck.x) * WALLK;
+  if (ck.x > W - MARGIN)    ck.vx -= (ck.x - (W - MARGIN)) * WALLK;
+  if (ck.y < MARGIN + HUD_H) ck.vy += (MARGIN + HUD_H - ck.y) * WALLK;
+  if (ck.y > H - MARGIN)    ck.vy -= (ck.y - (H - MARGIN)) * WALLK;
+  ck.x = clp(ck.x, 16, W-16);
+  ck.y = clp(ck.y, HUD_H + 16, H-16);
+
+  // 姿态
+  if (Math.abs(ck.vx) > 0.3) ck.dir = ck.vx > 0 ? 0 : 1;
+  ck.rot = lerp(ck.rot, clp(ck.vx * 0.02, -0.25, 0.25), 0.08);
+  if (ck.rv > 0.009 || ck.rv < -0.009){ ck.rot += ck.rv; ck.rv *= 0.97; }
+  else ck.rot += 0.008;
+  ck.wf += (Math.abs(ck.vx) + Math.abs(ck.vy) > 0.5) ? 0.10 : 0.05;
+  ck.bob = Math.sin(frame * 0.03) * 3;
+  if (ck.inv > 0) ck.inv--;
+
+  // 拖尾
+  if (frame % 4 === 0){
+    trail.push({ x:ck.x, y:ck.y, life:22 });
+    if (trail.length > 40) trail.shift();
+  }
+}
+
+// ===== 更新：太空世界 =====
+function updateSpace(){
+  moveChick();
+  if (state !== S.SPACE) return;   // startBuild 可能已切换状态
+
+  checkCollect();
+  if (state !== S.SPACE) return;
+  // 零件集齐后要孩子自己飞回中间的组装台（不再自动导航），到了才开工
+  if (partsDone && dst(ck, pad) < 58){ startBuild(); return; }
+  checkMeteors();
+  checkBeans();
+  antiStuck();
+
+  // 零件漂移
+  for (const p of parts){
+    p.x += p.vx; p.y += p.vy;
+    if (p.help > 0){
+      // 求助状态：稳稳朝小鸡飞过来，孩子不动也能拿到
+      p.help--;
+      const a = Math.atan2(ck.y - p.y, ck.x - p.x);
+      p.vx = lerp(p.vx, Math.cos(a) * 3.2, 0.12);
+      p.vy = lerp(p.vy, Math.sin(a) * 3.2, 0.12);
+    } else {
+      p.vx *= 0.97; p.vy *= 0.97;
+      p.vx += rand(-0.02,0.02); p.vy += rand(-0.02,0.02);
+    }
+    p.rot += p.rv;
+    if (p.x < 60) p.vx += 0.05; if (p.x > W-60) p.vx -= 0.05;
+    if (p.y < HUD_H+30) p.vy += 0.05; if (p.y > H-SAFE_BOTTOM) p.vy -= 0.05;
+    p.x = clp(p.x, 50, W-50); p.y = clp(p.y, HUD_H+25, H-SAFE_BOTTOM+15);
+  }
+  // 陨石
+  for (const m of meteors){
+    m.x += m.vx; m.y += m.vy; m.rot += m.rv;
+    if (m.x < 50 || m.x > W-50) m.vx *= -1;
+    if (m.y < HUD_H+25 || m.y > H-SAFE_BOTTOM+10) m.vy *= -1;
+    m.x = clp(m.x, 50, W-50); m.y = clp(m.y, HUD_H+25, H-SAFE_BOTTOM+10);
+  }
+  // 坏豆：定期朝小鸡冲刺
+  for (const b of beans){
+    if (b.dash > 0){
+      b.dash--;
+      b.x += b.dx; b.y += b.dy;
+      if (b.x < 50 || b.x > W-50) b.dx *= -1;
+      if (b.y < HUD_H+25 || b.y > H-SAFE_BOTTOM+10) b.dy *= -1;
+      b.x = clp(b.x, 50, W-50); b.y = clp(b.y, HUD_H+25, H-SAFE_BOTTOM+10);
+    } else {
+      b.cd--;
+      b.wob += 0.08;
+      if (b.cd <= 0){
+        const a = Math.atan2(ck.y - b.y, ck.x - b.x);
+        const sp = DIFFS[diff].spd;
+        b.dx = Math.cos(a) * sp; b.dy = Math.sin(a) * sp;
+        b.dash = 40; b.cd = rand(DIFFS[diff].cd0, DIFFS[diff].cd1);
+      }
+    }
+  }
+  // 远景剪影缓慢漂移
+  for (const d of decoParts){
+    d.x += d.vx; d.y += d.vy; d.rot += d.rv;
+    if (d.x < -30) d.x = W+30; if (d.x > W+30) d.x = -30;
+    if (d.y < HUD_H) d.vy = Math.abs(d.vy); if (d.y > H-SAFE_BOTTOM) d.vy = -Math.abs(d.vy);
+  }
+  // 组装台呼吸
+  pad.glow = (partGot >= STAGES[stage].need) ? 1 : 0;
+}
+
+// ===== 更新：过场 =====
+function updateCutscene(){
+  cs.t++;
+  const p = csP();
+
+  if (state === S.SLEEP){
+    if (cs.t === 1) say('小鸡在家里睡觉，呼噜噜', true);
+    if (cs.t >= cs.T) enterCutscene(S.EXPLODE, 130);
+    return;
+  }
+  if (state === S.EXPLODE){
+    if (cs.t === 1) say('咦？一个坏豆子！', true);
+    if (cs.t === 60 && !boomed){
+      boomed = true;
+      shake = 18;                       // 柔化：不用纯白闪，改彩色烟花
+      sBoom();
+      burst(W/2 + 60, H - 220, 46, ['#FFD54F','#FF8A65','#FF5252','#BA68C8','#FFFFFF'], 7, 46);
+      say('砰！坏豆爆炸啦！', true);
+    }
+    if (cs.t >= cs.T){ boomed = false; enterCutscene(S.BLASTOFF, 150); }
+    return;
+  }
+  if (state === S.BLASTOFF){
+    if (cs.t === 1) say('哇——小鸡飞到太空啦！', true);
+    const p = csP();
+    ck.x = W/2 + Math.sin(p * Math.PI * 3) * 45;
+    ck.y = lerp(H - 200, -90, p);
+    ck.rot = p * 26;
+    ck.wf = frame * 0.3;
+    if (frame % 3 === 0)
+      pushP({ x:ck.x + rand(-8,8), y:ck.y + rand(-8,8), vx:rand(-0.6,0.6), vy:rand(0.6,1.8),
+              life:18, clr:'#FFB74D', s:rand(3,6) });
+    if (cs.t >= cs.T){ initStage(0); }
+    return;
+  }
+  if (state === S.BUILD){
+    // 每个阶段装一块：零件飞入 → 第 34 帧咔哒装上 → 庆祝
+    if (cs.t === 34 && !built[stage]){
+      built[stage] = true;
+      sBuild();
+      burst(W/2, H/2 - 20, 14, ['#FFFFFF','#FFD54F','#4DD0E1'], 3.5, 26);
+      floaters.push({ x:W/2 + rand(-40,40), y:H/2 - 60, txt:'✨', life:40 });
+      say('咔哒！' + STAGES[stage].name + '装好啦！', true);
+    }
+    if (cs.t >= cs.T){
+      sLaunch();
+      burst(W/2, H/2 - 20, 30, ['#FFD54F','#4DD0E1','#FF8A65','#BA68C8','#4CAF50'], 5, 40);
+      nextStageOrHome();
+    }
+    return;
+  }
+  if (state === S.FLYHOME){
+    if (cs.t === 1) say('飞碟飞呀飞，地球到啦！', true);
+    const p = csP(), pe = easeOut(p);
+    const P0 = {x:W*0.12, y:H*0.14}, P1 = {x:W*0.78, y:H*0.20}, P2 = {x:W*0.46, y:H*0.56};
+    const u = 1 - pe;
+    ck.x = u*u*P0.x + 2*u*pe*P1.x + pe*pe*P2.x;
+    ck.y = u*u*P0.y + 2*u*pe*P1.y + pe*pe*P2.y;
+    if (cs.t % 2 === 0)
+      for (let i=0;i<3;i++)
+        pushP({ x:ck.x + rand(-10,10), y:ck.y + rand(-4,4), vx:rand(-1.2,-0.3), vy:rand(0.8,2.0),
+                life:22, clr:['#4DD0E1','#FFD54F','#FF8A65'][i%3], s:rand(3,6) });
+    if (cs.t >= cs.T){ state = S.WIN; sWin(); say('小鸡回到家啦！你真棒！', true); }
+    return;
+  }
+}
+
+// ===== 主更新 =====
+function update(){
+  frame++;
+
+  if (state === S.MENU){
+    menuT++;
+    if (menuT > 480) startGame();      // 8 秒没选，就用默认难度自动开场
+    stepParticles();
+    return;
+  }
+  if (state === S.WIN){
+    if (frame % 8 === 0){
+      const cl = ['🎉','⭐','✨','🌟','🎊'];
+      floaters.push({ x:rand(40, W-40), y:-20, txt:cl[(Math.random()*cl.length)|0],
+                      life:160, vy:rand(1.2,2.4) });
+    }
+    stepParticles();
+    return;
+  }
+  if (state === S.SPACE){ updateSpace(); }
+  else { updateCutscene(); }
+
+  // 星点闪烁
+  for (const s of stars) s.tw += 0.03;
+
+  stepParticles();
+  if (shake > 0){ shake *= 0.93; if (shake < 0.3) shake = 0; }
+  if (msgT > 0) msgT--;
+}
+
+function stepParticles(){
+  for (const p of particles){ p.x += p.vx; p.y += p.vy; p.life--; }
+  particles = particles.filter(p => p.life > 0);
+  for (const t of trail) t.life--;
+  trail = trail.filter(t => t.life > 0);
+  for (const f of floaters){ f.y -= (f.vy || 0.9); f.life--; }
+  floaters = floaters.filter(f => f.life > 0);
+  for (let i=0;i<dotPop.length;i++) if (dotPop[i] > 0) dotPop[i]--;
+}
+
+// ===== 绘制：背景 =====
+function drawSpace(){
+  const g = grad('space', function(){
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#0b1026'); g.addColorStop(0.55, '#141c47'); g.addColorStop(1, '#1d2a5e');
+    return g;
+  });
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const s of stars){
+    const a = 0.45 + Math.sin(s.tw) * 0.4;
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.28); ctx.fill();
+  }
+  // 远处飘着的零件剪影（"到处都是材料"）
+  for (const d of decoParts){
+    ctx.save();
+    ctx.globalAlpha = d.a;
+    drawPart(d.type, d.x, d.y, d.s, d.rot, 1);
+    ctx.restore();
+  }
+}
+
+function drawEarth(cx, cy, sc){
+  ctx.save();
+  ctx.translate(cx, cy); ctx.scale(sc, sc);
+  // 光晕
+  const g = grad('earthGlow', function(){
+    const g = ctx.createRadialGradient(0,0,90, 0,0,150);
+    g.addColorStop(0,'rgba(90,180,255,0.35)'); g.addColorStop(1,'rgba(90,180,255,0)');
+    return g;
+  });
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,150,0,6.28); ctx.fill();
+  // 球体
+  const eg = grad('earthBody', function(){
+    const eg = ctx.createLinearGradient(-95,-95,95,95);
+    eg.addColorStop(0,'#5DADE2'); eg.addColorStop(0.5,'#2E86C1'); eg.addColorStop(1,'#1B4F72');
+    return eg;
+  });
+  ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(0,0,95,0,6.28); ctx.fill();
+  // 大陆
+  ctx.fillStyle = '#52BE80';
+  ctx.beginPath(); ctx.ellipse(-25,-18, 34, 22, 0.4, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(35,10, 26, 30, -0.3, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-40,45, 22, 14, 0.2, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(10,-52, 18, 11, -0.5, 0, 6.28); ctx.fill();
+  // 云
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath(); ctx.ellipse(-55,25, 30, 9, 0.25, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(50,-35, 26, 8, -0.2, 0, 6.28); ctx.fill();
+  ctx.restore();
+}
+
+function drawHomeScene(night){
+  const g = grad(night ? 'homeNight' : 'homeDay', function(){
+    const g = ctx.createLinearGradient(0,0,0,H);
+    if (night){ g.addColorStop(0,'#101a4d'); g.addColorStop(1,'#28346e'); }
+    else { g.addColorStop(0,'#7EC8F5'); g.addColorStop(1,'#BFE9FF'); }
+    return g;
+  });
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  // 星星 / 太阳
+  if (night){
+    for (let i=0;i<26;i++){
+      const x = (i*137) % W, y = (i*61) % 260;
+      ctx.fillStyle = `rgba(255,255,255,${0.35+Math.sin(frame*0.05+i)*0.35})`;
+      ctx.beginPath(); ctx.arc(x,y,1.8,0,6.28); ctx.fill();
+    }
+    ctx.fillStyle = '#FFF9C4';
+    ctx.beginPath(); ctx.arc(W-110, 90, 34, 0, 6.28); ctx.fill();
+    ctx.fillStyle = g; // 用天空色挖出月牙
+    ctx.beginPath(); ctx.arc(W-92, 78, 30, 0, 6.28); ctx.fill();
+  } else {
+    ctx.fillStyle = '#FFD54F';
+    ctx.beginPath(); ctx.arc(W-110, 90, 38, 0, 6.28); ctx.fill();
+    ctx.strokeStyle = '#FFB300'; ctx.lineWidth = 3;
+    for (let i=0;i<8;i++){
+      const a = i * 0.785 + frame*0.005;
+      ctx.beginPath();
+      ctx.moveTo(W-110 + Math.cos(a)*48, 90 + Math.sin(a)*48);
+      ctx.lineTo(W-110 + Math.cos(a)*62, 90 + Math.sin(a)*62);
+      ctx.stroke();
+    }
+  }
+  // 草地
+  ctx.fillStyle = night ? '#2E7D32' : '#66BB6A';
+  ctx.fillRect(0, H-150, W, 150);
+  ctx.fillStyle = night ? '#256b28' : '#57A85C';
+  for (let i=0;i<40;i++){
+    const x = (i*97) % W;
+    ctx.fillRect(x, H-150, 3, 10);
+  }
+  // 小屋
+  const hx = W*0.72, hy = H-150;
+  ctx.fillStyle = '#8D6E63'; ctx.fillRect(hx-55, hy-90, 110, 90);
+  ctx.fillStyle = '#D84315';
+  ctx.beginPath(); ctx.moveTo(hx-70, hy-90); ctx.lineTo(hx, hy-145); ctx.lineTo(hx+70, hy-90); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = night ? '#FFE082' : '#B3E5FC';
+  ctx.fillRect(hx-30, hy-70, 44, 40);
+  ctx.strokeStyle = '#5D4037'; ctx.lineWidth = 3;
+  ctx.strokeRect(hx-30, hy-70, 44, 40);
+  ctx.beginPath(); ctx.moveTo(hx-8, hy-70); ctx.lineTo(hx-8, hy-30);
+  ctx.moveTo(hx-30, hy-50); ctx.lineTo(hx+14, hy-50); ctx.stroke();
+  // 门
+  ctx.fillStyle = '#6D4C41'; ctx.fillRect(hx+20, hy-62, 32, 62);
+}
+
+function drawBed(cx, cy){
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.fillStyle = '#795548'; ctx.fillRect(-52, 8, 104, 12);      // 床板
+  ctx.fillStyle = '#A1887F'; ctx.fillRect(-52, -14, 16, 26);     // 枕头
+  ctx.fillStyle = '#EFEFEF'; ctx.fillRect(-36, -6, 70, 16);      // 被子
+  ctx.fillStyle = '#B3E5FC'; ctx.fillRect(-36, -6, 70, 6);
+  ctx.fillStyle = '#5D4037'; ctx.fillRect(-50, 20, 8, 16); ctx.fillRect(42, 20, 8, 16);
+  ctx.restore();
+}
+
+// ===== 绘制：小鸡 =====
+function drawChickAt(x, y, sc, rot, opt){
+  opt = opt || {};
+  const s = 20;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.scale(sc, sc);
+  ctx.translate(0, opt.bob || 0);
+
+  // 宇航头盔泡泡
+  if (opt.helmet){
+    ctx.beginPath(); ctx.arc(0, -2, s*1.5, 0, 6.28);
+    ctx.fillStyle = 'rgba(150,210,255,0.14)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.6; ctx.stroke();
+  }
+  // 脚
+  if (!opt.asleep){
+    ctx.strokeStyle = '#FF9800'; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+    const fw = Math.sin(opt.wf || 0) * 3;
+    ctx.beginPath();
+    ctx.moveTo(-5, s*0.72); ctx.lineTo(-7 - fw, s*0.95);
+    ctx.moveTo(5, s*0.72);  ctx.lineTo(7 + fw, s*0.95);
+    ctx.stroke();
+  }
+  // 翅膀
+  const wing = Math.sin(opt.wf || 0) * (opt.wingAmp || 0.5);
+  ctx.fillStyle = '#FFD54F';
+  ctx.save(); ctx.translate(-s*0.72, -2); ctx.rotate(-0.5 - wing*0.5);
+  ctx.beginPath(); ctx.ellipse(0, 0, s*0.36, s*0.54, 0, 0, 6.28); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.translate(s*0.72, -2); ctx.rotate(0.5 + wing*0.5);
+  ctx.beginPath(); ctx.ellipse(0, 0, s*0.36, s*0.54, 0, 0, 6.28); ctx.fill(); ctx.restore();
+  // 身体
+  ctx.fillStyle = '#FFE066';
+  ctx.beginPath(); ctx.arc(0, 0, s*0.86, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = '#F5C518'; ctx.lineWidth = 1.6; ctx.stroke();
+  // 尾巴
+  ctx.fillStyle = '#FFD54F';
+  ctx.beginPath();
+  ctx.moveTo(-s*0.7, -s*0.3);
+  ctx.lineTo(-s*1.15, -s*0.75);
+  ctx.lineTo(-s*0.65, -s*0.62);
+  ctx.closePath(); ctx.fill();
+  // 冠
+  ctx.fillStyle = '#FF5252';
+  for (let i=0;i<3;i++){
+    ctx.beginPath(); ctx.arc(-6 + i*6, -s*0.88, 3.4 - i*0.4, 0, 6.28); ctx.fill();
+  }
+  // 眼睛
+  if (opt.asleep){
+    ctx.strokeStyle = '#4E342E'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(-5, -4, 4, 0.35, Math.PI-0.35); ctx.stroke();
+    ctx.beginPath(); ctx.arc(6, -4, 4, 0.35, Math.PI-0.35); ctx.stroke();
+  } else {
+    const ey = opt.scared ? 4.6 : 4;
+    ctx.fillStyle = '#3E2723';
+    ctx.beginPath(); ctx.arc(-5, -5, ey, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -5, ey, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-3.6, -6.4, 1.5, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.arc(7.4, -6.4, 1.5, 0, 6.28); ctx.fill();
+  }
+  // 嘴
+  ctx.fillStyle = '#FF9800';
+  ctx.beginPath();
+  if (opt.scared){
+    ctx.ellipse(1, 3, 4.6, 3.4, 0, 0, 6.28);
+  } else {
+    ctx.moveTo(-4, 1); ctx.lineTo(6, 1); ctx.lineTo(1, 7);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// ===== 绘制：零件 / 陨石 / 坏豆 =====
+function drawPart(type, x, y, s, rot, alpha){
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot);
+  if (alpha !== undefined) ctx.globalAlpha = alpha;
+  if (type === 'hull'){
+    ctx.fillStyle = '#B0BEC5';
+    ctx.beginPath(); ctx.ellipse(0, 0, s, s*0.42, 0, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#CFD8DC';
+    ctx.beginPath(); ctx.ellipse(0, -s*0.12, s*0.7, s*0.26, 0, 0, 6.28); ctx.fill();
+    ctx.strokeStyle = '#78909C'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, 0, s, s*0.42, 0, 0, 6.28); ctx.stroke();
+  } else if (type === 'engine'){
+    ctx.fillStyle = '#FF7043';
+    ctx.beginPath();
+    ctx.moveTo(-s*0.5, -s*0.5); ctx.lineTo(s*0.5, -s*0.5);
+    ctx.lineTo(s*0.35, s*0.5); ctx.lineTo(-s*0.35, s*0.5);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFD54F'; ctx.fillRect(-s*0.55, -s*0.66, s*1.1, s*0.18);
+    const fh = s * (0.3 + Math.abs(Math.sin(frame*0.3)) * 0.3);
+    ctx.fillStyle = '#FFEB3B';
+    ctx.beginPath(); ctx.moveTo(-s*0.24, s*0.5); ctx.lineTo(0, s*0.5+fh); ctx.lineTo(s*0.24, s*0.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FF9800';
+    ctx.beginPath(); ctx.moveTo(-s*0.12, s*0.5); ctx.lineTo(0, s*0.5+fh*0.7); ctx.lineTo(s*0.12, s*0.5); ctx.closePath(); ctx.fill();
+  } else if (type === 'dome'){
+    ctx.fillStyle = 'rgba(77,208,225,0.85)';
+    ctx.beginPath(); ctx.arc(0, s*0.25, s*0.75, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#0097A7'; ctx.fillRect(-s*0.78, s*0.2, s*1.56, s*0.15);
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-s*0.4, s*0.1); ctx.lineTo(-s*0.15, -s*0.45); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s*0.1, s*0.05); ctx.lineTo(s*0.28, -s*0.4); ctx.stroke();
+  } else if (type === 'antenna'){
+    ctx.fillStyle = '#FFD54F'; ctx.fillRect(-s*0.09, -s*0.8, s*0.18, s*1.4);
+    ctx.fillStyle = '#FFB300';
+    ctx.beginPath(); ctx.ellipse(0, s*0.6, s*0.4, s*0.14, 0, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#FF5252';
+    ctx.beginPath(); ctx.arc(0, -s*0.88, s*0.22, 0, 6.28); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(0, -s*0.88, s*0.55, -Math.PI*0.78, -Math.PI*0.22); ctx.stroke();
+  } else { // fuel
+    ctx.fillStyle = '#26C6DA';
+    rrect(-s*0.35, -s*0.62, s*0.7, s*1.24, s*0.34); ctx.fill();
+    ctx.fillStyle = '#00838F'; ctx.fillRect(-s*0.2, -s*0.8, s*0.4, s*0.2);
+    ctx.font = `${Math.round(s*0.75)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#FFFFFF'; ctx.fillText('⚡', 0, s*0.1);
+  }
+  ctx.restore();
+}
+
+function drawPartOnField(p){
+  // 呼吸光晕 + 虚线圈，让孩子一眼看见
+  const gl = 0.22 + Math.sin(frame * 0.07 + p.bounce) * 0.12;
+  ctx.fillStyle = `rgba(255,255,200,${gl})`;
+  ctx.beginPath(); ctx.arc(p.x, p.y, 28, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${0.3 + Math.sin(frame*0.07 + p.bounce)*0.2})`;
+  ctx.setLineDash([5,5]); ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(p.x, p.y, 34, 0, 6.28); ctx.stroke();
+  ctx.setLineDash([]);
+  const fy = Math.sin(frame * 0.02 + p.bounce) * 3;
+  drawPart(p.type, p.x, p.y + fy, 20, p.rot, 1);
+}
+
+function drawMeteor(m){
+  ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.rot);
+  ctx.fillStyle = '#6D5B4B';
+  ctx.beginPath();
+  for (let i=0;i<m.shape.length;i++){
+    const a = i / m.shape.length * 6.28, r = m.shape[i];
+    const px = Math.cos(a)*r, py = Math.sin(a)*r;
+    i === 0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#4E4034'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#4E4034';
+  ctx.beginPath(); ctx.arc(-m.r*0.3, -m.r*0.2, m.r*0.22, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.arc(m.r*0.35, m.r*0.15, m.r*0.16, 0, 6.28); ctx.fill();
+  ctx.restore();
+}
+
+// 迷你坏豆：给难度卡片显示怪物数量用
+function drawBeanMini(x, y, r){
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#7E57C2';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = '#5E35B1'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-r*0.32, -r*0.16, r*0.27, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.arc( r*0.32, -r*0.16, r*0.27, 0, 6.28); ctx.fill();
+  ctx.fillStyle = '#311B92';
+  ctx.beginPath(); ctx.arc(-r*0.32, -r*0.16, r*0.13, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.arc( r*0.32, -r*0.16, r*0.13, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = '#311B92'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-r*0.6, -r*0.6); ctx.lineTo(-r*0.12, -r*0.4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( r*0.6, -r*0.6); ctx.lineTo( r*0.12, -r*0.4); ctx.stroke();
+  ctx.restore();
+}
+
+function drawBean(b){
+  ctx.save(); ctx.translate(b.x, b.y);
+  const sq = b.dash > 0 ? 1 + Math.sin(frame * 0.5) * 0.12 : 1 + Math.sin(b.wob) * 0.06;
+  ctx.scale(sq, 2 - sq);
+  ctx.fillStyle = '#7E57C2';
+  ctx.beginPath(); ctx.ellipse(0, 0, b.r, b.r*0.88, 0, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = '#5E35B1'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-5, -3, 4.6, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.arc(5, -3, 4.6, 0, 6.28); ctx.fill();
+  ctx.fillStyle = '#311B92';
+  ctx.beginPath(); ctx.arc(-5, -3, 2.2, 0, 6.28); ctx.fill();
+  ctx.beginPath(); ctx.arc(5, -3, 2.2, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = '#311B92'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-9, -9); ctx.lineTo(-2, -6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(9, -9); ctx.lineTo(2, -6); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 5, 4, 0.2, Math.PI-0.2); ctx.stroke();
+  ctx.restore();
+}
+
+// ===== 绘制：组装台 =====
+function drawPad(){
+  const ready = partGot >= STAGES[stage].need;
+  ctx.save();
+  ctx.setLineDash([9,7]);
+  ctx.lineDashOffset = -frame * 0.6;
+  ctx.strokeStyle = ready
+    ? `rgba(255,213,79,${0.7 + Math.sin(frame*0.1)*0.3})`
+    : 'rgba(255,255,255,0.28)';
+  ctx.lineWidth = ready ? 4 : 2.4;
+  ctx.beginPath(); ctx.arc(pad.x, pad.y, 62, 0, 6.28); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = ready ? 'rgba(255,213,79,0.12)' : 'rgba(255,255,255,0.05)';
+  ctx.beginPath(); ctx.arc(pad.x, pad.y, 62, 0, 6.28); ctx.fill();
+  ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = ready ? '#FFD54F' : 'rgba(255,255,255,0.4)';
+  ctx.fillText('🔧', pad.x, pad.y);
+  ctx.restore();
+}
+
+// ===== 绘制：飞碟 =====
+function drawSaucer(x, y, sc, blt, opt){
+  opt = opt || {};
+  blt = blt || [true,true,true,true,true];
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(sc, sc);
+  const t = opt.t || 0;   // 呼吸放大
+  ctx.scale(1 + t, 1 + t);
+
+  if (blt[1]){ // 引擎火焰
+    const fh = 16 + Math.abs(Math.sin(frame*0.4)) * 12;
+    ctx.fillStyle = '#FFEB3B';
+    ctx.beginPath(); ctx.moveTo(-14, 12); ctx.lineTo(0, 12+fh); ctx.lineTo(14, 12); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FF9800';
+    ctx.beginPath(); ctx.moveTo(-7, 12); ctx.lineTo(0, 12+fh*0.7); ctx.lineTo(7, 12); ctx.closePath(); ctx.fill();
+  }
+  if (blt[4]){ // 燃料罐
+    for (const sx of [-34, 34]){
+      ctx.save(); ctx.translate(sx, 16); ctx.scale(0.45,0.45);
+      ctx.fillStyle = '#26C6DA'; rrect(-14,-24,28,48,12); ctx.fill();
+      ctx.fillStyle = '#00838F'; ctx.fillRect(-8,-31,16,8);
+      ctx.restore();
+    }
+  }
+  if (blt[1]){ // 引擎本体
+    ctx.fillStyle = '#FF7043';
+    ctx.beginPath(); ctx.moveTo(-18, 4); ctx.lineTo(18, 4); ctx.lineTo(12, 16); ctx.lineTo(-12, 16); ctx.closePath(); ctx.fill();
+  }
+  // 碟身
+  if (blt[0]){
+    const g = grad('saucerHull', function(){
+      const g = ctx.createLinearGradient(0,-18,0,18);
+      g.addColorStop(0,'#ECEFF1'); g.addColorStop(1,'#90A4AE');
+      return g;
+    });
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 0, 60, 20, 0, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#F5F5F5';
+    ctx.beginPath(); ctx.ellipse(0, -7, 34, 13, 0, 0, 6.28); ctx.fill();
+    ctx.strokeStyle = '#78909C'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, 0, 60, 20, 0, 0, 6.28); ctx.stroke();
+    // 底部彩灯
+    const cols = ['#FF5252','#FFD54F','#4CAF50','#4DD0E1','#BA68C8'];
+    for (let i=0;i<5;i++){
+      const a = Math.PI * (0.18 + i*0.16);
+      ctx.fillStyle = cols[i];
+      ctx.globalAlpha = 0.55 + Math.sin(frame*0.1 + i)*0.45;
+      ctx.beginPath(); ctx.arc(Math.cos(a)*46, Math.sin(a)*15 + 4, 4, 0, 6.28); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // 中缝
+    ctx.strokeStyle = '#78909C'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-52, 3); ctx.lineTo(52, 3); ctx.stroke();
+  }
+  if (blt[3]){ // 天线
+    ctx.fillStyle = '#FFD54F'; ctx.fillRect(-3, -46, 6, 30);
+    ctx.fillStyle = '#FF5252';
+    ctx.globalAlpha = (frame % 60 < 30) ? 1 : 0.45;
+    ctx.beginPath(); ctx.arc(0, -49, 6, 0, 6.28); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(0, -49, 14, -Math.PI*0.78, -Math.PI*0.22); ctx.stroke();
+  }
+  if (blt[2]){ // 玻璃罩
+    ctx.fillStyle = 'rgba(77,208,225,0.82)';
+    ctx.beginPath(); ctx.arc(0, -14, 26, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, -14, 26, Math.PI, 0); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(-14, -20); ctx.lineTo(-6, -34); ctx.stroke();
+    if (opt.chick){  // 玻璃罩里的小鸡
+      ctx.save(); ctx.translate(0, -20); ctx.scale(0.52, 0.52);
+      ctx.translate(0, Math.sin(frame*0.06)*2);
+      drawChickAt(0, 0, 1, 0, { wf: frame*0.12, wingAmp: 0.6, helmet:false });
+      ctx.restore();
+    }
+    ctx.fillStyle = '#0097A7'; ctx.fillRect(-27, -15, 54, 5);
+  }
+  ctx.restore();
+}
+
+// ===== 绘制：特效 =====
+function drawTrail(){
+  for (const t of trail){
+    ctx.fillStyle = `rgba(255,230,120,${t.life/22*0.32})`;
+    ctx.beginPath(); ctx.arc(t.x, t.y, 5, 0, 6.28); ctx.fill();
+  }
+}
+function drawParticles(){
+  for (const p of particles){
+    ctx.globalAlpha = clp(p.life / 30, 0, 1) * 0.95;
+    ctx.fillStyle = p.clr;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 6.28); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawFloaters(){
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floaters){
+    ctx.globalAlpha = clp(f.life / 40, 0, 1);
+    ctx.font = '26px serif';
+    ctx.fillText(f.txt, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+function shakeOffset(){
+  if (shake <= 0) return {x:0, y:0};
+  return { x: rand(-shake,shake)*0.8, y: rand(-shake,shake)*0.6 };
+}
+
+// ===== HUD（全图形化，不识字也看得懂）=====
+function drawHUD(){
+  ctx.fillStyle = 'rgba(0,0,0,0.38)'; ctx.fillRect(0, 0, W, HUD_H);
+  const sz = 42, gap = 6, bx = 12;
+  // 左：5 个阶段格子
+  for (let i=0;i<STAGES.length;i++){
+    const x = bx + i*(sz+gap), y = 8;
+    let bg, bd, al;
+    if (built[i]){ bg='#4CAF50'; bd='#2E7D32'; al=1; }
+    else if (i === stage){ bg='rgba(255,255,255,0.22)'; bd=`rgba(255,255,255,${0.5+Math.sin(frame*0.09)*0.4})`; al=1; }
+    else { bg='rgba(255,255,255,0.07)'; bd='rgba(255,255,255,0.18)'; al=0.32; }
+    ctx.fillStyle = bg; rrect(x, y, sz, sz, 9); ctx.fill();
+    ctx.strokeStyle = bd; ctx.lineWidth = 2.2; rrect(x, y, sz, sz, 9); ctx.stroke();
+    ctx.globalAlpha = al;
+    drawPart(STAGES[i].key, x + sz/2, y + sz/2 + 1, 13, 0, 1);
+    ctx.globalAlpha = 1;
+    if (built[i]){
+      ctx.font = '13px serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#fff'; ctx.fillText('✅', x + sz - 1, y + 1);
+    }
+  }
+  // 中：当前阶段还差几个
+  const st = STAGES[stage];
+  const dx0 = bx + STAGES.length*(sz+gap) + 26;
+  for (let i=0;i<st.need;i++){
+    const cx = dx0 + i*22, cy = 29, pop = dotPop[i] || 0;
+    const r = 7 * (1 + pop * 0.03);
+    if (i < partGot){
+      ctx.fillStyle = 'rgba(255,213,79,0.35)';
+      ctx.beginPath(); ctx.arc(cx, cy, r+4, 0, 6.28); ctx.fill();
+      ctx.fillStyle = '#FFD54F';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.28); ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.28); ctx.stroke();
+    }
+  }
+}
+
+function drawVoiceBtn(){
+  ctx.font = '20px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,255,255,0.16)';
+  ctx.beginPath(); ctx.arc(W-34, 30, 18, 0, 6.28); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText(voiceOn ? '🔊' : '🔇', W-34, 31);
+}
+
+// 没集齐时，箭头指向最近的零件
+// 零件齐了在组装台上方画个大箭头，提示孩子自己飞回去
+function drawHomeHint(){
+  if (state !== S.SPACE || !partsDone) return;
+  const y = pad.y - 96 + Math.sin(frame*0.08)*8;
+  ctx.save();
+  ctx.fillStyle = `rgba(255,213,79,${0.6 + Math.sin(frame*0.1)*0.35})`;
+  ctx.beginPath();
+  ctx.moveTo(pad.x, y + 42); ctx.lineTo(pad.x - 27, y); ctx.lineTo(pad.x + 27, y);
+  ctx.closePath(); ctx.fill();
+  ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('🔧', pad.x, y - 20);
+  ctx.restore();
+}
+
+function drawGuideArrow(){
+  if (state !== S.SPACE) return;
+  let tx, ty, gold = false;
+  if (partsDone){ tx = pad.x; ty = pad.y; gold = true; }
+  else {
+    if (parts.length === 0) return;
+    let best = null, bd = 1e9;
+    for (const p of parts){ const d = dst(p, ck); if (d < bd){ bd = d; best = p; } }
+    if (!best || bd < 190) return;
+    tx = best.x; ty = best.y;
+  }
+  const d = Math.hypot(tx - ck.x, ty - ck.y);
+  if (d < 46) return;
+  const a = Math.atan2(ty - ck.y, tx - ck.x);
+  const s = gold ? 1.5 : 1;
+  ctx.save();
+  ctx.translate(ck.x + Math.cos(a)*58, ck.y + Math.sin(a)*58);
+  ctx.rotate(a);
+  ctx.fillStyle = gold
+    ? `rgba(255,213,79,${0.55 + Math.sin(frame*0.12)*0.35})`
+    : `rgba(255,245,157,${0.45 + Math.sin(frame*0.1)*0.3})`;
+  ctx.beginPath(); ctx.moveTo(20*s,0); ctx.lineTo(1*s,-11*s); ctx.lineTo(1*s,11*s); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawMessage(){
+  if (msgT <= 0) return;
+  ctx.globalAlpha = msgT > 30 ? 1 : msgT/30;
+  ctx.font = 'bold 18px "Microsoft YaHei"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(msg, W/2, HUD_H + 34);
+  ctx.globalAlpha = 1;
+}
+
+// ===== 界面 =====
+function drawMenu(){
+  drawSpace();
+  drawEarth(W/2, H + 130, 1.7);
+  drawSaucer(W/2, H/2 - 30, 1.15, [true,true,true,true,true], { chick:true, t:Math.sin(frame*0.04)*0.03 });
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(0,0,20,0.35)';
+  rrect(W/2 - 230, 78, 460, 96, 18); ctx.fill();
+  ctx.font = 'bold 38px "Microsoft YaHei"'; ctx.fillStyle = '#fff';
+  ctx.fillText('🐤 小鸡太空飞碟', W/2, 112);
+  ctx.font = '17px "Microsoft YaHei"'; ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText('造一个飞碟，飞回家！', W/2, 148);
+  // 难度选择：三张卡，全图形化（星星 + 怪物数量），不识字也能选
+  const cw = 200, ch = 150, gap = 22;
+  const total = DIFFS.length * cw + (DIFFS.length - 1) * gap;
+  const x0 = (W - total) / 2, y0 = H/2 + 48;
+  diffCards = [];
+  for (let i=0;i<DIFFS.length;i++){
+    const d = DIFFS[i], x = x0 + i*(cw+gap), y = y0, on = (i === diff);
+    diffCards.push({ x, y, w:cw, h:ch, idx:i });
+    ctx.fillStyle   = on ? 'rgba(255,213,79,0.22)' : 'rgba(255,255,255,0.10)';
+    rrect(x, y, cw, ch, 16); ctx.fill();
+    ctx.strokeStyle = on ? '#FFD54F' : 'rgba(255,255,255,0.32)';
+    ctx.lineWidth   = on ? 3.5 : 2;
+    rrect(x, y, cw, ch, 16); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '20px serif'; ctx.fillStyle = '#fff';
+    ctx.fillText(d.stars, x + cw/2, y + 30);
+    ctx.font = 'bold 27px "Microsoft YaHei"';
+    ctx.fillText(d.name, x + cw/2, y + 66);
+    const n = d.beans, sp = 27, bx0 = x + cw/2 - (n-1)*sp/2;
+    for (let k=0;k<n;k++) drawBeanMini(bx0 + k*sp, y + 106, 11);
+    ctx.font = '13px "Microsoft YaHei"'; ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.fillText('怪物 ' + n + ' 只', x + cw/2, y + 133);
+  }
+  const ba = 0.5 + Math.sin(frame*0.07)*0.5;
+  ctx.font = 'bold 21px "Microsoft YaHei"'; ctx.fillStyle = `rgba(255,245,157,${ba})`;
+  ctx.fillText('选一个难度开始', W/2, H - 44);
+}
+
+function drawWin(){
+  drawHomeScene(false);
+  // 彩虹
+  const rc = ['#FF5252','#FF9800','#FFD54F','#4CAF50','#4DD0E1','#5C6BC0','#BA68C8'];
+  for (let i=0;i<7;i++){
+    ctx.strokeStyle = rc[i]; ctx.lineWidth = 9;
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath(); ctx.arc(W/2, H-120, 150 + i*11, Math.PI, 0); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  drawSaucer(W*0.34, H - 205, 0.95, [true,true,true,true,true], { chick:true, t:0 });
+  // 窗户里的小鸡（回老家了）
+  drawFloaters();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(0,0,30,0.3)';
+  rrect(W/2 - 210, 96, 420, 92, 18); ctx.fill();
+  ctx.font = 'bold 36px "Microsoft YaHei"'; ctx.fillStyle = '#fff';
+  ctx.fillText('🏡 小鸡回家啦！', W/2, 128);
+  ctx.font = '18px "Microsoft YaHei"'; ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillText('你自己造出了飞碟，真棒！', W/2, 162);
+  const ba = 0.5 + Math.sin(frame*0.07)*0.5;
+  ctx.font = 'bold 20px "Microsoft YaHei"'; ctx.fillStyle = `rgba(255,245,157,${ba})`;
+  ctx.fillText('再玩一次', W/2, H - 60);
+}
+
+// 竖屏提示：把手机转过来（不识字也懂）
+function drawRotateHint(){
+  ctx.fillStyle = '#0b1026'; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const cx = W/2, cy = H/2 - 30;
+  const a = frame * 0.03;
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(Math.sin(a) * 0.5 - 0.5);
+  // 手机外形
+  ctx.fillStyle = '#ECEFF1';
+  rrect(-38, -66, 76, 132, 12); ctx.fill();
+  ctx.fillStyle = '#1d2a5e';
+  rrect(-32, -56, 64, 112, 8); ctx.fill();
+  ctx.fillStyle = '#4DD0E1';
+  rrect(-20, -44, 40, 88, 5); ctx.fill();
+  ctx.restore();
+  // 旋转箭头
+  ctx.strokeStyle = '#FFD54F'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, cy, 108, -Math.PI*0.75, Math.PI*0.35); ctx.stroke();
+  ctx.fillStyle = '#FFD54F';
+  const ea = Math.PI*0.35;
+  ctx.save();
+  ctx.translate(cx + Math.cos(ea)*108, cy + Math.sin(ea)*108);
+  ctx.rotate(ea + Math.PI/2);
+  ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(13,12); ctx.lineTo(-13,12); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 26px "Microsoft YaHei"';
+  ctx.fillText('把手机横过来', cx, cy + 160);
+  ctx.font = '17px "Microsoft YaHei"'; ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillText('转一下就好啦', cx, cy + 196);
+}
+
+// ===== 主绘制 =====
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const so = shakeOffset();
+  ctx.save();
+  ctx.translate(so.x, so.y);
+
+  if (state === S.MENU){
+    drawMenu();
+    drawParticles();
+  }
+  else if (state === S.SLEEP){
+    drawHomeScene(true);
+    drawBed(W*0.42, H - 78);
+    drawChickAt(W*0.42, H - 92, 1, -0.15, { asleep:true, wf:frame*0.02, wingAmp:0.12, helmet:false, bob:Math.sin(frame*0.04)*1.5 });
+    // 头顶 Z
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i=0;i<3;i++){
+      const ph = ((cs.t + i*60) % 180) / 180;
+      ctx.globalAlpha = (1-ph) * 0.9;
+      ctx.font = `bold ${16 + i*7}px "Microsoft YaHei"`;
+      ctx.fillStyle = '#FFF9C4';
+      ctx.fillText('Z', W*0.42 + 26 + ph*26, H - 132 - ph*54);
+    }
+    ctx.globalAlpha = 1;
+    // 坏豆偷偷滑入
+    const bxx = lerp(W + 60, W*0.86, clp(cs.t / 90, 0, 1));
+    drawBean({ x:bxx, y:H - 176, r:16, dash:0, wob:frame*0.08 });
+    drawParticles();
+    drawVoiceBtn();
+  }
+  else if (state === S.EXPLODE){
+    drawHomeScene(true);
+    drawBed(W*0.42, H - 78);
+    const scared = cs.t >= 60;
+    drawChickAt(W*0.42, H - 96 - (scared ? (cs.t-60)*0.9 : 0), 1, -0.15 + (scared ? Math.sin(cs.t*0.4)*0.2 : 0),
+                { asleep:!scared, scared, wf:frame*0.25, wingAmp:0.8, helmet:false });
+    // 坏豆跳到门口
+    const hop = Math.abs(Math.sin(cs.t * 0.25)) * 22;
+    const bxx = lerp(W*0.86, W*0.74, clp(cs.t / 55, 0, 1));
+    const pulse = 1 + Math.sin(cs.t * 0.4) * 0.15;
+    ctx.save(); ctx.translate(bxx, H - 176 - hop); ctx.scale(pulse, pulse);
+    drawBean({ x:0, y:0, r:16 + clp((cs.t-40)*0.12, 0, 8), dash:0, wob:frame*0.1 });
+    ctx.restore();
+    if (cs.t < 60 && cs.t % 8 === 0) snd(200 + cs.t*4, 0.06, 'square', 0.08);
+    drawParticles();
+    drawFloaters();
+    drawVoiceBtn();
+  }
+  else if (state === S.BLASTOFF){
+    drawSpace();
+    const p = csP();
+    for (const s of stars) s.y -= 6;          // 星点下滚 → 强化上升感
+    drawEarth(W/2, lerp(H*1.05, H + 430, p), lerp(1.8, 0.45, p));
+    // 小鸡旋转上升
+    const bx = W/2 + Math.sin(p * Math.PI * 3) * 45;
+    const by = lerp(H - 200, -90, p);
+    ck.x = bx; ck.y = by;
+    drawTrail();
+    drawChickAt(bx, by, 1, p * 26, { wf:frame*0.3, wingAmp:0.9, scared:true, helmet:true });
+    ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p < 0.18 ? '💥' : (p < 0.6 ? '😲' : '🚀'), bx + 34, by - 26);
+    ctx.font = 'bold 24px "Microsoft YaHei"';
+    ctx.globalAlpha = 0.6 + Math.sin(frame*0.08)*0.4;
+    ctx.fillStyle = '#fff';
+    ctx.fillText('哇——飞到太空啦！', W/2, H - 80);
+    ctx.globalAlpha = 1;
+    drawParticles();
+    drawVoiceBtn();
+  }
+  else if (state === S.SPACE){
+    drawSpace();
+    drawPad();
+    for (const m of meteors) drawMeteor(m);
+    for (const b of beans) drawBean(b);
+    for (const p of parts) drawPartOnField(p);
+    drawTrail();
+    // 小鸡（无敌帧闪烁）
+    ctx.save();
+    if (ck.inv > 0 && ck.inv % 8 < 4) ctx.globalAlpha = 0.45;
+    drawChickAt(ck.x, ck.y + ck.bob, 1, ck.rot, { wf:ck.wf, wingAmp:0.55, helmet:ck.helmet, scared:ck.stun>0 });
+    ctx.restore();
+    // 指哪飞哪的目标圈
+    if (tapTarget){
+      ctx.strokeStyle = `rgba(255,255,255,${0.35 + Math.sin(frame*0.12)*0.25})`;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.arc(tapTarget.x, tapTarget.y, 16, 0, 6.28); ctx.stroke();
+      ctx.beginPath(); ctx.arc(tapTarget.x, tapTarget.y, 4, 0, 6.28); ctx.stroke();
+    }
+    drawHomeHint();
+    drawGuideArrow();
+    drawParticles();
+    drawFloaters();
+  }
+  else if (state === S.BUILD){
+    drawSpace();
+    ctx.fillStyle = 'rgba(0,0,20,0.5)'; ctx.fillRect(0,0,W,H);
+    drawPad();
+    // 零件飞入
+    if (cs.t < 34){
+      const t = clp(cs.t / 34, 0, 1);
+      drawPart(STAGES[stage].key, W/2, lerp(-50, H/2 - 20, t), 22, t*5, 1);
+    }
+    drawSaucer(W/2, H/2 - 20, 1, built, { t:Math.sin(csP()*Math.PI)*0.12, chick:built[2] });
+    drawParticles();
+    drawFloaters();
+  }
+  else if (state === S.FLYHOME){
+    drawSpace();
+    const p = csP(), pe = easeOut(p);
+    for (const s of stars) s.x -= 1.2;
+    drawEarth(W/2, lerp(H + 400, H*0.78, pe), lerp(0.35, 1.5, pe));
+    // 贝塞尔弧线
+    const P0 = {x:W*0.12, y:H*0.14}, P1 = {x:W*0.78, y:H*0.20}, P2 = {x:W*0.46, y:H*0.56};
+    const u = 1 - pe;
+    const bx = u*u*P0.x + 2*u*pe*P1.x + pe*pe*P2.x;
+    const by = u*u*P0.y + 2*u*pe*P1.y + pe*pe*P2.y;
+    ck.x = bx; ck.y = by;
+    const sc = p > 0.82 ? lerp(0.9, 0.3, (p-0.82)/0.18) : lerp(0.55, 0.9, pe);
+    drawSaucer(bx, by, sc, [true,true,true,true,true], { chick:true, t:0 });
+    drawParticles();
+    if (p > 0.82){
+      ctx.fillStyle = `rgba(255,255,255,${(p-0.82)/0.18 * 0.85})`;
+      ctx.fillRect(0,0,W,H);
+    }
+    drawVoiceBtn();
+  }
+  else if (state === S.WIN){
+    drawWin();
+    drawParticles();
+    drawVoiceBtn();
+  }
+
+  ctx.restore();
+
+  // HUD 与提示（不受震动影响）
+  if (state === S.SPACE || state === S.BUILD){
+    drawHUD();
+    drawVoiceBtn();
+    drawMessage();
+  }
+  // 还没交互过（自动开场的情况）→ 提示点一下解锁声音
+  if (!voiceReady && (state === S.MENU || state === S.SPACE || state === S.BUILD)){
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.45 + Math.sin(frame*0.08)*0.45;
+    ctx.font = '24px serif';
+    ctx.fillText('👆', W/2, H - 42);
+    ctx.font = '15px "Microsoft YaHei"'; ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText('点一下，就有声音啦', W/2, H - 20);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ===== 竖屏检测 =====
+function isPortrait(){ return window.innerHeight > window.innerWidth * 1.15; }
+
+// ===== 主循环（固定步长 · 单 rAF · 页面不可见时暂停）=====
+let acc = 0, last = 0, loopRaf = 0;
+function loop(t){
+  // 唯一的一处续帧请求，保证任何时刻只有一个主循环
+  loopRaf = requestAnimationFrame(loop);
+  if (!last) last = t;
+  let dt = t - last; last = t;
+  if (dt > 100) dt = 100;
+
+  if (isPortrait()){
+    acc = 0;
+    drawRotateHint();
+    return;
+  }
+  acc += dt;
+  let n = 0;
+  while (acc >= 16.667 && n < 3){ update(); acc -= 16.667; n++; }
+  if (n === 3) acc = 0;
+  draw();
+}
+/* last=0 → 下一帧重取时间基准，后台回来不会一次性补一大堆帧 */
+function startLoop(){ if (!loopRaf){ last = 0; acc = 0; loopRaf = requestAnimationFrame(loop); } }
+function stopLoop(){ if (loopRaf){ cancelAnimationFrame(loopRaf); loopRaf = 0; } }
+
+// ===== 画布 DPR / 尺寸自适应（只在 resize 时读一次 rect，绝不放进 rAF）=====
+let layoutTimer = 0;
+function resizeCanvas(){
+  const r = canvas.getBoundingClientRect();
+  const w = Math.round(r.width), h = Math.round(r.height);
+  if (!w || !h) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);   // DPR 上限锁 2
+  const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+  if (bw === canvas.width && bh === canvas.height) return;  // 尺寸没变就别重建画布
+  canvas.width  = bw;
+  canvas.height = bh;
+  // 逻辑坐标恒定 900×650，靠 transform 映射到物理像素
+  ctx.setTransform(bw / W, 0, 0, bh / H, 0, 0);
+}
+/* resize 节流 100ms，避免 iPad 分屏拖动时反复重建画布 */
+function scheduleResize(){
+  if (layoutTimer) return;
+  layoutTimer = setTimeout(function(){ layoutTimer = 0; resizeCanvas(); }, 100);
+}
+resizeCanvas();
+if (window.ResizeObserver) new ResizeObserver(scheduleResize).observe(canvas);
+window.addEventListener('resize', scheduleResize);
+window.addEventListener('orientationchange', function(){ setTimeout(resizeCanvas, 200); });
+
+/* 切后台 / 来电：停主循环 + 停语音，回来再恢复 */
+document.addEventListener('visibilitychange', function(){
+  if (document.hidden){
+    stopLoop();
+    if (window.speechSynthesis){ try { speechSynthesis.cancel(); } catch(e){} }
+  } else {
+    resizeCanvas();     // 后台可能被改过视口，回来先对齐一次
+    startLoop();
+  }
+});
+
+// ===== 启动 =====
+resetStars();
+genDeco();
+built = [false,false,false,false,false];
+state = S.MENU;
+startLoop();
+
+</script>
+</body>
+</html>

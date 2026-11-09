@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    participant R as rAF loop
+    participant GS as Game.step(dt)
+    participant IN as Input
+    participant PH as Physics
+    participant AU as Audio
+    participant RN as Render.frame(alpha)
+
+    R->>R: dtMs = t - last（钳制 ≤250ms）
+    R->>R: acc += dtMs/1000
+    loop acc >= 1/120（最多 6 步）
+        GS->>IN: 采样输入快照 hold / holdMs / tapEdge
+        GS->>GS: Game.step(1/120)
+
+        GS->>GS: ① 计时 segTimeMs / totalTimeMs（paused 中途事件不计）
+        GS->>GS: ② 水平运动 vx → approach(target, rate*dt)
+        GS->>GS: ③ 跳跃判定（grounded + tap + holdMs≥180 → vy=-880/-980）
+        GS->>GS: ④ 垂直积分 vy += g*dt（夹 +1400）→ y += vy*dt
+        GS->>GS: ⑤ 支撑面 supportY(s, footY) → grounded / 落水
+        GS->>GS: ⑥ 碰撞扫描：obstacles + movers
+        alt 命中障碍
+            GS->>AU: Audio.play('bump') + ('ouch') + ('stand_pop')
+            GS->>GS: hitT = 0.9s 三段演出计时（压扁/坐星/站起）<br/>vx=±180, vy=-420 弹开；输入忽略但不打断
+        else 未命中
+            GS->>GS: hitT -= dt
+        end
+        GS->>GS: ⑦ 相遇检测（|Δs| ≤ 96）→ 气泡 + 打招呼 + 入队
+        GS->>GS: ⑧ 卡关检测（同位置 6s 无前进）→ 辅助前进 1.5s + 手指演示
+        GS->>GS: ⑨ 终点判定（L1-4: s≥exitX；L5: 子状态机转移）
+        GS->>GS: ⑩ 相机 targetS + 指数平滑
+        GS->>GS: ⑪ 写入 prevX/prevY（供插值）
+    end
+    R->>RN: Render.frame(alpha = acc/(1/120))
+    RN->>RN: clear → 天空(z0) → 远/中景 → 地面带 → 箭头带 → 障碍 → 角色(按 s 排序) → 粒子 → 前景 → HUD
+    Note over RN: 渐变走 grad(key, make) 缓存，不每帧重建
+    RN->>RN: 位置插值 x = prevX + (x-prevX)*alpha

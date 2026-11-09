@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>小鸡回家吃饭</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <div id="app">
+
+    <canvas id="cv" width="750" height="1334"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div class="hud-top">
+        <button id="btn-back" class="ico-btn">‹ 返回</button>
+        <div class="hud-title" id="hud-level">第 1 关</div>
+        <div class="hud-right">
+          <span id="hud-time">0.0s</span>
+          <span class="team-tag">🐤<span id="hud-team">×0</span></span>
+          <button id="btn-pause" class="ico-btn">❚❚</button>
+        </div>
+      </div>
+      <div class="energy-wrap">
+        <div class="energy-label">电量</div>
+        <div class="energy-bar"><div id="energy-fill"></div></div>
+      </div>
+      <div class="hud-bottom">
+        <button id="btn-hint" class="mini-btn">提示</button>
+        <button id="fire-btn" class="fire-btn p0">按住发射</button>
+        <div class="hint-space"></div>
+      </div>
+    </div>
+
+    <!-- 主菜单 -->
+    <div id="screen-menu" class="screen">
+      <div class="logo">
+        <div class="logo-chick">🐤</div>
+        <h1>小鸡回家吃饭</h1>
+        <p class="tag">找伙伴 · 破门 · 回家吃饭</p>
+        <p class="prog" id="menu-progress">已通关 0 关 · 伙伴 0/8</p>
+      </div>
+      <div class="menu-btns">
+        <button id="btn-start" class="big-btn primary">开始游戏</button>
+        <button id="btn-levels" class="big-btn">关卡选择</button>
+        <button id="btn-codex" class="big-btn">伙伴图鉴</button>
+        <button id="btn-sound" class="big-btn ghost">音效：开</button>
+      </div>
+      <p class="tip-line">点地面移动 · 按住下方按钮发射激光</p>
+    </div>
+
+    <!-- 关卡选择 -->
+    <div id="screen-levels" class="screen hidden">
+      <div class="panel">
+        <h2>关卡选择</h2>
+        <div id="level-list" class="level-list"></div>
+        <button id="btn-lv-back" class="big-btn ghost">返回</button>
+      </div>
+    </div>
+
+    <!-- 开场剧情 -->
+    <div id="screen-intro" class="screen hidden">
+      <div class="panel intro-panel">
+        <h2 id="intro-title">第 1 关</h2>
+        <div id="intro-text" class="intro-text"></div>
+        <button id="btn-intro-go" class="big-btn primary">出发！</button>
+        <button id="btn-intro-back" class="big-btn ghost">返回</button>
+      </div>
+    </div>
+
+    <!-- 暂停 -->
+    <div id="screen-pause" class="screen hidden dim">
+      <div class="panel small-panel">
+        <h2>暂停</h2>
+        <button id="btn-resume" class="big-btn primary">继续游戏</button>
+        <button id="btn-pause-retry" class="big-btn">重玩本关</button>
+        <button id="btn-pause-menu" class="big-btn ghost">回主界面</button>
+      </div>
+    </div>
+
+    <!-- 结算 -->
+    <div id="screen-result" class="screen hidden">
+      <div class="panel result-panel">
+        <h2 id="result-title">回到家啦！</h2>
+        <div id="result-stars" class="stars"></div>
+        <div id="result-info" class="result-info"></div>
+        <div id="result-finale" class="finale hidden">
+          <p id="finale-text"></p>
+          <div class="finale-btns">
+            <button id="btn-duck-yes" class="big-btn primary small">让它进来</button>
+            <button id="btn-duck-no" class="big-btn ghost small">不用了</button>
+          </div>
+        </div>
+        <button id="btn-next" class="big-btn primary">下一关</button>
+        <button id="btn-retry" class="big-btn">再玩一次</button>
+        <button id="btn-menu" class="big-btn ghost">回主界面</button>
+      </div>
+    </div>
+
+    <!-- 图鉴 -->
+    <div id="screen-codex" class="screen hidden">
+      <div class="panel">
+        <h2>伙伴图鉴</h2>
+        <div id="codex-list" class="codex-list"></div>
+        <button id="btn-cx-back" class="big-btn ghost">返回</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/levels.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/render.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

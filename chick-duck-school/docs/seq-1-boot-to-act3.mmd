@@ -1,0 +1,60 @@
+sequenceDiagram
+    autonumber
+    participant U as 玩家
+    participant M as 90-main.js
+    participant S as 05-save.js
+    participant G as 60-game.js
+    participant A as 10-audio.js
+    participant St as 40-story.js
+    participant UI as 80-ui.js
+
+    U->>M: 双击 index.html / 从 hub 点进来
+    M->>M: applyDpr + fit() 布局适配
+    M->>S: Save.load()
+    alt localStorage 不可用 / JSON 损坏 / 类型错 / 版本超前
+        S-->>M: 返回 defaultSave()（静默，不报错不白屏）
+    else 正常
+        S-->>M: 返回 sanitize 后的存档
+    end
+    M->>A: Audio.init()（懒创建 AudioContext，不 resume）
+    M->>UI: UI.showTitle(save)
+    M->>G: Game.state = 'title'
+    M->>M: startLoop()
+
+    U->>UI: 点「开始上学」
+    UI->>G: Game.goto('act1')
+    G->>A: Audio.play('sunlight'); Audio.music('nightLullaby')
+    G->>St: Story.play('act1')
+    Note over St: 幕一约 25s：呼吸起伏 → 呼噜 3 段递进<br/>→ 6s 渐弱（底线 3.2s）→ 静默 1s → 金光扫过
+
+    alt 玩家未操作
+        St-->>G: t >= 25000ms
+    else 玩家点击画面或 ⏩ 按钮
+        U->>St: pointerdown
+        St->>A: Audio.fadeOut('snore', 300) + Audio.stopMusic(300)
+        Note over St: 从当前进度平滑续演渐弱尾段，不重新开始；<br/>渐弱演出仍需播满剩余的 3.2s 底线
+    end
+    St-->>G: act1 done
+    G->>A: Audio.music('schoolMarch', fadeMs 500)
+    G->>St: Story.play('act2')
+
+    loop 幕二 6 段，每段一次点击
+        U->>St: pointerdown
+        St->>G: Save.data.hygiene 置位（如 wash=true）→ Save.flush()
+        G->>UI: 四个勾点亮进度
+    end
+    St-->>G: act2 done（上学铃响）
+    G->>G: Game.goto('act3'); Game.loadLevel(1)
+    G->>UI: UI.hideStory()
+
+    loop 关 1 → 2 → 3 → 4
+        G->>G: 本关跑完 → 结算面板（星星/用时/碰撞/相遇）
+        U->>UI: 点「下一关」
+        G->>G: Game.loadLevel(n+1)
+    end
+
+    G->>G: Game.loadLevel(5) → 子状态 goOut
+    G->>G: 跑回起点 → clear → 胜利演出 → 顶层 finale
+    G->>UI: UI.showResult(总评) + 「再玩一次 / 回主页」
+    U->>UI: 点「回主页」
+    UI->>G: Game.goto('title'); Save.flush()

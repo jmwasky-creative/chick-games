@@ -1,0 +1,269 @@
+classDiagram
+    class DUCK {
+        <<constants>>
+        +number GRID = 64
+        +number GRAVITY = 2200
+        +number V0_TAP = -880
+        +number V0_HOLD = -980
+        +number CRUISE = 265
+        +number FIXED_DT = 1/120
+        +number MAX_STEPS = 6
+        +number BOX_W = 44
+        +number BOX_H = 52
+        +number AUTO_RUN_FROM_LEVEL = 2
+        +string SAVE_KEY
+        +number DESIGN_W = 960
+        +number DESIGN_H = 640
+    }
+
+    class Save {
+        <<singleton>>
+        +object data
+        +load() object
+        +flush() void
+        +reset() void
+        +sanitize(src, def) object
+        +defaultSave() object
+        +bumpStat(name) void
+    }
+
+    class SaveData {
+        <<plain object>>
+        +number version
+        +Progress progress
+        +Gallery gallery
+        +Hygiene hygiene
+        +Settings settings
+        +Stats stats
+    }
+
+    class Progress {
+        +number unlocked
+        +object cleared
+        +Checkpoint l5Checkpoint
+    }
+
+    class Checkpoint {
+        +string phase
+        +number segTimeMs
+        +number bumps
+        +array met
+    }
+
+    class Level {
+        <<data>>
+        +number id
+        +string name
+        +array stars
+        +number bumpCap
+        +number cruise
+        +array terrain
+        +array obstacles
+        +array movers
+        +array actors
+        +object tutorial
+        +string scene
+        +number exitX
+        +string bgm
+    }
+
+    class Level5 {
+        <<special>>
+        +boolean roundTrip = true
+        +Origin origin
+        +Segment outbound
+        +Segment inbound
+        +MidEvent midEvent
+    }
+
+    class Segment {
+        +number dir
+        +number segLen
+        +number cruise
+        +string sky
+        +string arrows
+        +number groundY
+        +string scene
+        +array actors
+        +array obstacles
+        +Boost boost
+        +number safeTail
+    }
+
+    class Boost {
+        +number s0
+        +number s1
+        +number mul
+    }
+
+    class Obstacle {
+        +number s
+        +string type
+        +number w
+        +number h
+        +boolean solid
+        +boolean fall
+    }
+
+    class Actor {
+        +string id
+        +number s
+        +string action
+        +array lines
+        +string follow
+    }
+
+    class Game {
+        <<singleton>>
+        +string state
+        +string prevState
+        +number levelIndex
+        +string subState
+        +string seg
+        +number dir
+        +Duck duck
+        +array obstacles
+        +array movers
+        +array team
+        +array met
+        +array particles
+        +number camS
+        +number segTimeMs
+        +number totalTimeMs
+        +number bumps
+        +number hitT
+        +number stuckT
+        +step(dt) void
+        +goto(state) void
+        +loadLevel(i) void
+        +loadSegment(seg) void
+        +gotoSubState(s) void
+        +applyBump(obs) void
+        +onMeet(actor) void
+    }
+
+    class Duck {
+        <<entity>>
+        +number s
+        +number x
+        +number y
+        +number prevX
+        +number prevY
+        +number vx
+        +number vy
+        +boolean grounded
+        +number facing
+        +number lastFace
+        +number hitT
+        +number landSquashT
+        +number invulnT
+        +string animState
+    }
+
+    class Physics {
+        <<pure functions>>
+        +step(duck, seg, dt) void
+        +supportY(seg, s, footY) number
+        +aabb(a, b) boolean
+        +applyBump(duck, dir) void
+        +nearestSafeS(seg, s) number
+    }
+
+    class Art {
+        <<singleton>>
+        +object CHAR_DEF
+        +object POSES
+        +object Parts
+        +resolve(charId, animState, opts) object
+        +drawScene(scene, camS) void
+        +drawObstacle(o, sx, alpha) void
+        +drawActor(charId, animState, sx, opts) void
+        +emit(name, x, y, n) void
+    }
+
+    class CharDef {
+        +string name
+        +string body
+        +string line
+        +number size
+        +string accessory
+    }
+
+    class Render {
+        <<singleton>>
+        +grad(key, make) CanvasGradient
+        +frame(alpha) void
+        +drawLayer(z, camS) void
+        +hitRect(id) Rect
+        +worldToScreenX(s, dir, camS, viewW) number
+        +clearGradCache() void
+    }
+
+    class Audio {
+        <<singleton>>
+        +init() void
+        +unlock() void
+        +play(name, opt) void
+        +stop(name) void
+        +fadeOut(name, ms) void
+        +setLoop(name, on) void
+        +music(name, opt) void
+        +stopMusic(fadeMs) void
+        +setMusicEnabled(b) void
+        +setSfxEnabled(b) void
+        +resumeClock() void
+        +pauseClock() void
+    }
+
+    class Story {
+        <<singleton>>
+        +play(act) void
+        +tap() void
+        +skipAct1() void
+        +tick(dt) void
+        +isDone() boolean
+    }
+
+    class UI {
+        <<singleton>>
+        +showTitle() void
+        +showLevels() void
+        +showSettings() void
+        +showPause() void
+        +showResult(r) void
+        +hideStory() void
+        +setHud(h) void
+        +copyStats() void
+    }
+
+    SaveData "1" o-- "1" Progress
+    SaveData "1" o-- "1" Save
+    Progress "1" o-- "0..1" Checkpoint
+    Level5 "1" *-- "2" Segment
+    Level5 "1" *-- "1" Boost
+    Level5 "1" *-- "1" MidEvent
+    Segment "1" *-- "1" Boost
+    Segment "1" *-- "n" Obstacle
+    Segment "1" *-- "n" Actor
+    Level "1" *-- "n" Obstacle
+    Level "1" *-- "n" Actor
+    Game "1" o-- "1" Duck
+    Game "1" o-- "1" Level
+    Game "1" o-- "0..1" Level5
+    Game "1" o-- "n" Obstacle
+    Game "1" o-- "0..8" Actor
+    Game "1" ..> Physics : 调用纯函数
+    Game "1" ..> Save : 读写存档
+    Game "1" ..> Audio : 播音效与BGM
+    Game "1" ..> Story : 幕一/幕二
+    Game "1" ..> Art : 解析姿态
+    Game "1" ..> Render : 触发绘制
+    Game "1" ..> UI : 通知面板
+    Render "1" o-- "1" Art
+    Render "1" ..> DUCK : 读常量
+    Art "1" *-- "9" CharDef
+    Art "1" *-- "9" POSES
+    Physics "1" ..> DUCK : 读常量
+    Audio "1" ..> DUCK : 读常量
+    Save "1" ..> DUCK : 读常量
+    UI "1" ..> Save : 读设置

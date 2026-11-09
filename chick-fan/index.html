@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1.0,user-scalable=no,viewport-fit=cover" />
+<meta name="theme-color" content="#FFD35C" />
+<title>小鸡吹风扇</title>
+<style>
+  /* iOS 安全区：供 JS 的 recomputeLayout 读取，也用于 body 内边距 */
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    /* 与 hub 统一的设计语言：圆角三档 + 统一缓动/时长 */
+    --r-sm: 14px;
+    --r-md: 18px;
+    --r-lg: 22px;
+    --ease: cubic-bezier(.22,.61,.36,1);
+    --dur: .22s;
+  }
+  /* 暖色底纹：与 hub 的 --bg / --chick 同色系，游戏面板（奶白）能自然浮出来 */
+  html, body { margin:0; padding:0; background:#EFCE87; }
+  body {
+    /* 100dvh 处理 iOS Safari 地址栏；fallback 100vh */
+    min-height:100vh; min-height:100dvh;
+    background:linear-gradient(180deg, #FFE9B8 0%, #F2D293 55%, #E0B96F 100%);
+    padding:var(--sat) var(--sar) var(--sab) var(--sal);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family: "PingFang SC","Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color:#4A3722;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  #gameWrapper {
+    position:relative;
+    /* 用 transform: scale() 缩 canvas，整个游戏区按 9:6.5 等比 fit 视口 */
+    width: 900px;
+    height: 650px;
+    transform-origin: center center;
+    background:#FFFBEC;
+    border-radius:var(--r-sm);
+    box-shadow: 0 16px 48px rgba(0,0,0,.35);
+    overflow:visible;
+  }
+  canvas { display:block; width:100%; height:100%; border-radius:var(--r-sm); }
+  #title { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; background: radial-gradient(circle at 50% 30%, #FFE9B8, #F5D585 70%); }
+  #title.show { display:flex; }
+  #title .mascot { font-size:96px; filter:drop-shadow(0 6px 14px rgba(228,69,58,.25)); }
+  #title h1 { margin:0; font-size:44px; color:#E4453A; text-shadow: 0 2px 0 rgba(255,255,255,.6); letter-spacing:0.04em; }
+  #title p { margin:0; font-size:18px; color:#8A7250; }
+  /* 统一缓动曲线：cubic-bezier(.22,.61,.36,1) / 180–260ms */
+  #title button {
+    background:#FFD35C; color:#4A3722; border:3px solid #E8B660; border-radius:999px;
+    padding:14px 34px; font-size:22px; font-weight:700; font-family:inherit;
+    box-shadow:0 6px 0 #C97A1E; cursor:pointer; margin-top:8px; min-height:56px;
+    transition:transform .22s cubic-bezier(.22,.61,.36,1), box-shadow .22s cubic-bezier(.22,.61,.36,1);
+    touch-action:manipulation;
+  }
+  #title button:active { transform:translateY(3px); box-shadow:0 2px 0 #C97A1E; }
+  /* 儿童友好：提示文字加大加深，不再用 14px + opacity 0.75 */
+  #title .tip { font-size:16px; font-weight:600; color:#6B5230; max-width:520px; text-align:center; line-height:1.7; }
+  /* 交互提示：尚未解锁声音 */
+  #audioHint {
+    position:absolute; left:50%; bottom:18px; transform:translateX(-50%);
+    background:rgba(0,0,0,.55); color:#fff; padding:8px 16px; border-radius:999px;
+    font-size:14px; opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  #audioHint.show { opacity:1; }
+  /* 静音按钮（顶 HUD 右上） */
+  #muteBtn {
+    position:absolute; right:14px; top:14px; width:44px; height:44px;
+    border-radius:50%; background:rgba(0,0,0,.4); border:none; color:#fff;
+    font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    z-index: 5;
+  }
+  #muteBtn:active { transform:scale(0.94); }
+  @media (pointer:coarse) { #muteBtn { width:54px; height:54px; font-size:26px; } }
+
+  /* ====== 窄高度适配（iPad Split View / 横屏紧 / 小屏手机） ====== */
+  /* 视口高度 < 720px（放不下 900x650 完整游戏）时：缩小 tab 区、减小外边距 */
+  @media (max-height: 720px) {
+    /* 用 calc 叠加安全区，别把 safe-area 覆盖掉（横屏 iPhone 尤其重要） */
+    body { padding: calc(var(--sat) + 4px) var(--sar) calc(var(--sab) + 4px) var(--sal); }
+    #title h1 { font-size: 32px; }
+    #title .mascot { font-size: 70px; }
+    #title p { font-size: 15px; }
+    #title button { padding: 9px 24px; font-size: 18px; }
+  }
+  /* 视口高度 < 560px（极窄，例如横屏 iPad + Split View）时：进一步紧凑 */
+  @media (max-height: 560px) {
+    body { padding: calc(var(--sat) + 2px) var(--sar) calc(var(--sab) + 2px) var(--sal); }
+    #gameWrapper { border-radius: var(--r-sm); }
+  }
+  /* ====== 极宽屏（横屏台式机 / 4K）也保持比例不拉伸 ====== */
+  @media (min-aspect-ratio: 4/3) and (min-width: 1200px) {
+    /* 已由 aspect-ratio + min() 自动处理，无需额外 CSS */
+  }
+
+  /* ====== 无障碍：尊重系统的「减少动态效果」 ====== */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration:.01ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:.08s !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="gameWrapper">
+  <canvas id="game" width="900" height="650" role="img"
+          aria-label="小鸡吹风扇游戏画面：把风扇拖到同色圈圈里装好"></canvas>
+  <div id="title" class="show">
+    <div class="mascot">🐤</div>
+    <h1>小鸡吹风扇</h1>
+    <p>把风扇拖到同色的圈圈里 · 装齐就能睡觉</p>
+    <button id="btnStart">开始玩</button>
+    <p class="tip">客厅 / 卧室 / 厨房 · 三种风扇 · 拖拽安装</p>
+  </div>
+  <button id="muteBtn" title="静音">🔊</button>
+  <div id="audioHint">👆 点点屏幕，开启声音</div>
+</div>
+
+<script>
+// =============================================================
+// 《小鸡吹风扇》 — 5-6 岁儿童口述游戏
+// 骨架复用 chick-ufo(物理/绘制/语音) + chick-cola(拖拽/AUDIO/SAVE)
+// 单文件零依赖。Canvas 900x650.
+// =============================================================
+'use strict';
+
+// ===== 工具 =====
+const $ = (s, r) => (r || document).querySelector(s);
+function rand(a,b){ return Math.random()*(b-a)+a; }
+function dst(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+function clp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function easeOut(t){ return 1 - (1-t)*(1-t); }
+
+// ===== 常量 =====
+const W = 900, H = 650;
+const HUD_H = 72;          // 顶部 HUD 高度
+const TABS_H = 70;         // 底部 tab 栏高度
+const PLAYFIELD_BOTTOM = H - TABS_H;   // 580
+const SAFE_TOP = HUD_H + 8;
+const SAFE_BOTTOM = PLAYFIELD_BOTTOM - 8;
+
+const ACC = 0.5, MAXV = 4.6, DAMP = 0.960;
+const MARGIN = 32, WALLK = 0.018;
+const GRAB_R = 66;        // 风扇抓取圈
+const SNAP_R = 96;        // 槽位磁吸圈
+const GRAB_R_ASSIST = 100;
+const SNAP_R_ASSIST = 190;
+const IDLE_LIMIT = 480;
+
+// ===== 状态机 =====
+const S = { TITLE:0, INTRO:1, PLAY:2, BUILD:3, SLEEP:4, WAKE:5, FREE:6, GOODNIGHT:7 };
+let state = S.TITLE;
+
+// ===== 房间数据 =====
+const ROOMS = [
+  { id:'living',  name:'客厅', bg:'#FFE9B8', floor:'#F5D585', wall:'#FAEFD0', accent:'#E8B660' },
+  { id:'bedroom', name:'卧室', bg:'#E8D5F5', floor:'#D5BBE8', wall:'#F0E5F5', accent:'#9F7AC4' },
+  { id:'kitchen', name:'厨房', bg:'#FFE0CC', floor:'#F5C9A8', wall:'#FFEFD8', accent:'#D9704A' }
+];
+let activeRoom = 'living';
+
+// ===== 风扇类型 =====
+const FAN_TYPES = [
+  { key:'small', name:'小风扇', color:'#7FD8F0', accent:'#31A8C6',
+    s:18, bladeLen:11, bladeWid:4, blades:3, speed:0.45, cordLen:20,
+    hasBase:false, hasPole:false },
+  { key:'table', name:'台扇',   color:'#9BE7B8', accent:'#3FA96A',
+    s:22, bladeLen:14, bladeWid:5, blades:4, speed:0.30, cordLen:40,
+    hasBase:true,  hasPole:false },
+  { key:'floor', name:'落地扇', color:'#FFC2A8', accent:'#D9704A',
+    s:26, bladeLen:17, bladeWid:6, blades:5, speed:0.20, cordLen:110,
+    hasBase:true,  hasPole:true  }
+];
+function fanSpec(key){ return FAN_TYPES.find(f => f.key === key); }
+
+// ===== 6 个槽位（每房间 2 个）=====
+const SLOTS = {
+  living: [
+    { id:'L0', x:260, y:420, r:50, rot:0, expectFan:'table', expectColor:'#9BE7B8', state:'idle', installedBy:null },
+    { id:'L1', x:640, y:420, r:50, rot:0, expectFan:'small', expectColor:'#7FD8F0', state:'idle', installedBy:null }
+  ],
+  bedroom: [
+    { id:'B0', x:200, y:360, r:50, rot:0, expectFan:'small', expectColor:'#7FD8F0', state:'idle', installedBy:null },
+    { id:'B1', x:700, y:360, r:50, rot:0, expectFan:'floor', expectColor:'#FFC2A8', state:'idle', installedBy:null }
+  ],
+  kitchen: [
+    { id:'K0', x:200, y:290, r:50, rot:0, expectFan:'table', expectColor:'#9BE7B8', state:'idle', installedBy:null },
+    { id:'K1', x:700, y:400, r:50, rot:0, expectFan:'floor', expectColor:'#FFC2A8', state:'idle', installedBy:null }
+  ]
+};
+const FAN_SPAWN = {
+  living:  [ { fan:'table', x:380, y:540 }, { fan:'small', x:520, y:540 } ],
+  bedroom: [ { fan:'small', x:380, y:540 }, { fan:'floor', x:520, y:540 } ],
+  kitchen: [ { fan:'table', x:380, y:540 }, { fan:'floor', x:520, y:540 } ]
+};
+
+// ===== 家具（轻遮挡，chick 可穿过）=====
+const FURNITURE = {
+  living: [
+    { type:'sofa',  x: 60, y:480, w:240, h:80, color:'#9F7AC4', cushion:'#B89AD8' },
+    { type:'tv',    x:350, y:110, w:200, h:70, color:'#3D4A5C', screen:'#5C7090' },
+    { type:'plant', x:830, y:130, w:50, h:120, color:'#3FA96A', leaves:'#5BC97F' },
+    { type:'rug',   x:200, y:380, w:500, h:80, color:'#C95A6B', pattern:'#E8B660' }
+  ],
+  bedroom: [
+    { type:'bed',       x:200, y:120, w:500, h:140, color:'#FFE066', sheets:'#FFFFFF', frame:'#E8B660' },
+    { type:'nightstand',x: 80, y:140, w:100, h: 80, color:'#B89AD8', top:'#D5BBE8' },
+    { type:'plant',     x:820, y:140, w: 50, h:120, color:'#3FA96A', leaves:'#5BC97F' },
+    { type:'rug',       x:300, y:370, w:300, h: 80, color:'#E8B660', pattern:'#FFE066' }
+  ],
+  kitchen: [
+    { type:'counter', x: 80, y:140, w:620, h: 70, color:'#F5E6D0', top:'#D5BBE8' },
+    { type:'fridge',  x:730, y:140, w:100, h:180, color:'#E8E8E8', door:'#D0D0D0' },
+    { type:'table',   x:280, y:380, w:340, h: 80, color:'#B89AD8', top:'#D5BBE8' },
+    { type:'plant',   x:830, y:480, w: 50, h: 80, color:'#3FA96A', leaves:'#5BC97F' }
+  ]
+};
+
+// ===== 背景剪影风扇（每房间 8 个，不可收集）=====
+const DECO_FANS = {
+  living: [
+    { x: 40, y:130, s: 9, a:0.22 }, { x: 90, y:220, s: 8, a:0.18 }, { x:160, y:130, s:10, a:0.25 }, { x:300, y:130, s: 8, a:0.20 },
+    { x:430, y:240, s: 9, a:0.22 }, { x:600, y:240, s:10, a:0.25 }, { x:780, y:130, s: 9, a:0.22 }, { x:880, y:300, s: 8, a:0.20 }
+  ],
+  bedroom: [
+    { x: 60, y:130, s: 9, a:0.22 }, { x:130, y: 90, s: 8, a:0.18 }, { x: 90, y:260, s:10, a:0.25 }, { x:760, y:140, s: 8, a:0.20 },
+    { x:780, y:280, s: 9, a:0.22 }, { x:780, y:480, s:10, a:0.25 }, { x:440, y:280, s: 9, a:0.22 }, { x:550, y:560, s: 8, a:0.20 }
+  ],
+  kitchen: [
+    { x: 50, y:120, s:10, a:0.25 }, { x:200, y: 90, s: 9, a:0.22 }, { x:400, y: 90, s: 8, a:0.20 }, { x:600, y: 90, s:10, a:0.25 },
+    { x:780, y:120, s: 9, a:0.22 }, { x: 50, y:360, s: 8, a:0.20 }, { x:440, y:300, s:10, a:0.25 }, { x:895, y:480, s: 9, a:0.22 }
+  ]
+};
+
+// ===== 自由玩物件 =====
+const FREE_OBJECTS = {
+  water:    { type:'water',     x:640, y:195, r:28, room:'kitchen', placed:false },
+  toilet:   { type:'toilet',    x:130, y:480, r:32, room:'bedroom', placed:false },
+  bedSleep: { type:'bed-sleep', x:450, y:190, r:60, room:'bedroom', placed:false }
+};
+
+// ===== 房间 tab（底部）=====
+const ROOM_TABS = [
+  { id:'living',  x:300, y:615, label:'客厅', w:110, h:50 },
+  { id:'bedroom', x:450, y:615, label:'卧室', w:110, h:50 },
+  { id:'kitchen', x:600, y:615, label:'厨房', w:110, h:50 }
+];
+
+// ===== Canvas 与 ctx =====
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ===== 数学 / 绘制工具 =====
+function rrect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+// ===== 全局状态 =====
+let frame = 0;
+let particles = [], trail = [], floaters = [];
+/* 尊重系统「减少动态效果」：粒子上限降下来，画面更安静也更快 */
+const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const P_MAX = REDUCED ? 60 : 220;
+function pushP(p){ if (particles.length < P_MAX) particles.push(p); }
+
+function burst(x, y, n, colors, spd=4, life=34){
+  if (REDUCED) n = Math.ceil(n / 3);
+  for (let i=0;i<n;i++){
+    const a = rand(0, Math.PI*2), v = rand(0.3,1)*spd;
+    pushP({ x, y, vx:Math.cos(a)*v, vy:Math.sin(a)*v, life:rand(life*0.6,life),
+            clr:colors[i%colors.length], s:rand(3,7) });
+  }
+}
+function stepParticles(){
+  for (const p of particles){ p.x += p.vx; p.y += p.vy; p.life--; }
+  particles = particles.filter(p => p.life > 0);
+  for (const t of trail) t.life--;
+  trail = trail.filter(t => t.life > 0);
+  for (const f of floaters){ f.y -= (f.vy || 0.9); f.life--; }
+  floaters = floaters.filter(f => f.life > 0);
+}
+
+// ===== 小鸡 =====
+const ck = {
+  x: 200, y: 480, vx: 0, vy: 0, rot: 0, rv: 0.008,
+  dir: 0, wf: 0, bob: 0, inv: 0, stun: 0, asleep: false,
+  target: null,   // "点哪走哪" 目标点（与拖拽互斥）
+  moving: false,
+};
+
+// ===== 风扇（待安装池） =====
+let spawnFans = [];   // 当前房间地面上的可拖风扇
+
+// ===== 拖拽状态 =====
+const drag = {
+  active: false,
+  pointerId: null,
+  fan: null,        // 正在拖的风扇引用
+  pickX: 0, pickY: 0,
+  dx: 0, dy: 0,
+  px: 0, py: 0,     // pointer 当前位置（画布坐标）
+  hoverSlot: null,  // 当前磁吸到的槽
+};
+
+// ===== 进度 =====
+let installedCount = 0;   // 已装风扇数
+let idleT = 0;            // 帧计数器
+let assist = false;       // 渐进 assist 开关
+
+// ===== 过场计时器 =====
+const cs = { t: 0, T: 0 };
+function enterCutscene(next, frames){ cs.t = 0; cs.T = frames; state = next; }
+function csP(){ return cs.T ? clp(cs.t / cs.T, 0, 1) : 1; }
+
+// =============================================================
+// 音频（AUDIO 模块 - 从 chick-cola 移植）
+// =============================================================
+const AUDIO = (function(){
+  let ac = null, master = null, noiseBuf = null, muted = false, ready = false;
+
+  function unlock(){
+    try{
+      if(!ac){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return;
+        ac = new AC();
+        master = ac.createGain();
+        master.gain.value = muted ? 0 : 0.18;
+        const lim = ac.createDynamicsCompressor();
+        lim.threshold.value = -12; lim.knee.value = 8; lim.ratio.value = 8;
+        lim.attack.value = 0.003; lim.release.value = 0.2;
+        master.connect(lim); lim.connect(ac.destination);
+      }
+      if(ac.state !== 'running') ac.resume();
+      ready = true;
+    }catch(e){ ready = false; }
+  }
+  function tone(type, f0, f1, delay, dur, vol){
+    if(!ready || !ac) return;
+    const t = ac.currentTime + delay;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  function noise(filterType, f0, f1, delay, dur, vol){
+    if(!ready || !ac) return;
+    if(!noiseBuf){
+      noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for(let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t = ac.currentTime + delay;
+    const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noiseBuf; s.loop = true;
+    f.type = filterType;
+    f.frequency.setValueAtTime(f0, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(master);
+    s.start(t); s.stop(t + dur + 0.03);
+  }
+  const SOUNDS = {
+    pickup(){ tone('sine', 660, 880, 0, 0.12, 0.12); tone('sine', 990, 1320, 0.07, 0.15, 0.10); },
+    tap(){    tone('sine', 520, 700, 0, 0.09, 0.09); },
+    install(){ noise('bandpass', 700, 2200, 0, 0.40, 0.045); tone('triangle', 280, 660, 0, 0.36, 0.04); },
+    good(){   tone('sine', 1200, 1800, 0, 0.10, 0.06); tone('sine', 1500, 2100, 0.10, 0.12, 0.05); },
+    cheer(){  [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, f * 1.03, i * 0.10, 0.22, 0.07)); },
+    water(){  tone('triangle', 145, 105, 0, 0.58, 0.05); noise('bandpass', 520, 220, 0, 0.58, 0.035); },
+    zzz(){    tone('sine', 220, 180, 0, 0.4, 0.04); tone('sine', 180, 140, 0.18, 0.5, 0.04); },
+    slide(){  noise('bandpass', 700, 2200, 0, 0.30, 0.04); tone('triangle', 280, 660, 0, 0.30, 0.04); }
+  };
+  return {
+    unlock,
+    play(name){ if(muted) return; try{ (SOUNDS[name] || function(){})(); }catch(e){} },
+    setMuted(v){
+      muted = !!v;
+      if(ac && master) master.gain.setTargetAtTime(muted ? 0 : 0.18, ac.currentTime, 0.02);
+    },
+    isMuted(){ return muted; }
+  };
+})();
+
+// =============================================================
+// 存档
+// =============================================================
+const SAVE_KEY = 'chick-fan:save:v1';
+const Save = {
+  data: { schema: 1, muted: false, updatedAt: 0 },
+  load(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) return;
+      const o = JSON.parse(raw);
+      if(!o || o.schema !== 1) return;
+      this.data.muted = !!o.muted;
+      this.data.updatedAt = o.updatedAt || 0;
+    }catch(e){ /* 损坏存档：保持默认 */ }
+  },
+  write(){
+    this.data.updatedAt = Date.now();
+    try{ localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); }catch(e){}
+  }
+};
+Save.load();
+
+// =============================================================
+// 语音 (speechSynthesis - 从 chick-ufo 移植)
+// =============================================================
+let voiceOn = true, voiceReady = false, zhVoice = null, voiceTries = 0;
+let lastSayText = '', lastSayTime = 0;
+const DEDUPE_MS = 8000;
+
+function pickZhVoice(){
+  if (!window.speechSynthesis) return null;
+  const vs = speechSynthesis.getVoices() || [];
+  return vs.find(v => /zh[-_]CN/i.test(v.lang)) || vs.find(v => /^zh/i.test(v.lang)) || null;
+}
+function initVoices(){
+  if (!window.speechSynthesis) { voiceOn = false; return; }
+  zhVoice = pickZhVoice();
+  if (!zhVoice && voiceTries++ < 30) setTimeout(initVoices, 100);
+  if (voiceTries >= 30 && !zhVoice) voiceOn = false;
+}
+if (window.speechSynthesis) {
+  initVoices();
+  try { speechSynthesis.onvoiceschanged = initVoices; } catch(e){}
+}
+function say(text, force){
+  if (!voiceOn || !voiceReady || !text) return;
+  if (!window.speechSynthesis || !zhVoice) return;
+  const now = (window.performance && performance.now) ? performance.now() : Date.now();
+  if (!force && text === lastSayText && now - lastSayTime < DEDUPE_MS) return;
+  lastSayText = text; lastSayTime = now;
+  try {
+    if (force) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN'; u.rate = 0.85; u.pitch = 1.15; u.volume = 0.9;
+    u.voice = zhVoice;
+    u.onend = u.onerror = function(){};
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+function unlockAV(){
+  AUDIO.unlock();
+  if (!voiceReady) voiceReady = true;
+  document.getElementById('audioHint').classList.remove('show');
+}
+
+// =============================================================
+// 启动 / 重置
+// =============================================================
+function resetGame(){
+  for (const r of Object.keys(SLOTS)){
+    for (const s of SLOTS[r]){ s.state = 'idle'; s.installedBy = null; }
+  }
+  installedCount = 0;
+  activeRoom = 'living';
+  ck.x = 200; ck.y = 480;
+  ck.vx = 0; ck.vy = 0;
+  ck.target = null; ck.moving = false;
+  ck.asleep = false;
+  drag.active = false;
+  drag.pointerId = null;
+  drag.fan = null;
+  drag.hoverSlot = null;
+  for (const k of Object.keys(FREE_OBJECTS)) FREE_OBJECTS[k].placed = false;
+  spawnFansForRoom(activeRoom);
+}
+
+function spawnFansForRoom(room){
+  spawnFans = FAN_SPAWN[room].map(s => ({
+    fan: s.fan, x: s.x, y: s.y,
+    homeX: s.x, homeY: s.y,
+    bladeRot: rand(0, 6.28),
+    picked: false, pickT: 0,  // 拾起后 150 帧未装则飘回
+    dragging: false,
+  }));
+}
+
+function startGame(){
+  resetGame();
+  enterCutscene(S.INTRO, 90);   // 1.5 秒开场
+  setTimeout(() => say('帮小鸡装风扇！', true), 200);
+}
+
+// =============================================================
+// 输入（pointerdown/move/up/cancel + 5 监听器结构）
+// =============================================================
+function toCanvasPoint(ev){
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (ev.clientX - r.left) / r.width  * W,
+    y: (ev.clientY - r.top)  / r.height * H
+  };
+}
+
+function findSlotAtPoint(x, y){
+  for (const s of SLOTS[activeRoom]){
+    if (s.state === 'success') continue;
+    if (dst({x,y}, s) <= s.r) return s;
+  }
+  return null;
+}
+
+function findSpawnFanAtPoint(x, y){
+  // 拖拽中只允许重新拿起同一个；未拖拽时按距离找
+  if (drag.active) return null;
+  let best = null, bd = 1e9;
+  for (const f of spawnFans){
+    if (f.dragging) continue;
+    const d = dst({x,y}, f);
+    if (d < bd){ bd = d; best = f; }
+  }
+  return best;
+}
+
+function tryInstallFan(fan, slot){
+  if (fan.fan !== slot.expectFan){
+    // 颜色错：柔性反馈（不惩罚）
+    return false;
+  }
+  // 正确安装
+  slot.state = 'success';
+  slot.installedBy = fan;
+  installedCount += 1;
+  fan.picked = false; fan.dragging = false;
+  // 风扇动画飞入槽心
+  fan.targetX = slot.x; fan.targetY = slot.y;
+  fan.installAnim = 0;
+  AUDIO.play('install');
+  burst(slot.x, slot.y, 24, [fanSpec(fan.fan).color, '#FFF59D', '#FFFFFF'], 4, 36);
+  floaters.push({ x: slot.x, y: slot.y - 40, txt: '✨', life: 50 });
+  const label = fanSpec(fan.fan).name;
+  say('咔哒！' + label + '装好啦！', true);
+  // 把 spawn 列表里这条移到已装池
+  spawnFans = spawnFans.filter(f => f !== fan);
+  // 全部装完？
+  if (installedCount === 6){
+    setTimeout(() => enterCutscene(S.BUILD, 110), 320);
+  }
+  return true;
+}
+
+function snapBackFan(fan){
+  // 拖到错位置或松手飞回
+  fan.targetX = fan.homeX;
+  fan.targetY = fan.homeY;
+  fan.snapT = 0;
+  fan.snapping = true;
+}
+
+canvas.addEventListener('pointerdown', ev => {
+  if (state !== S.PLAY && state !== S.FREE) return;
+  unlockAV();
+  const p = toCanvasPoint(ev);
+  drag.px = p.x; drag.py = p.y;
+  if (drag.pointerId !== null) return;
+  drag.pointerId = ev.pointerId;
+  try{ canvas.setPointerCapture(ev.pointerId); }catch(e){}
+  ev.preventDefault();
+  // 0. tab 切房间（MENU 也允许切）
+  if (p.y >= PLAYFIELD_BOTTOM && p.y < H){
+    for (const t of ROOM_TABS){
+      if (p.x >= t.x - t.w/2 && p.x <= t.x + t.w/2){
+        activeRoom = t.id;
+        spawnFansForRoom(activeRoom);
+        ck.x = 200; ck.y = 480;
+        ck.target = null;
+        AUDIO.play('tap');
+        return;
+      }
+    }
+  }
+  // 1. PLAY: 优先抓取 spawn 风扇
+  if (state === S.PLAY){
+    const fan = findSpawnFanAtPoint(p.x, p.y);
+    const gR = assist ? GRAB_R_ASSIST : GRAB_R;
+    if (fan && dst({x:p.x,y:p.y}, fan) <= gR){
+      drag.active = true;
+      drag.fan = fan;
+      fan.dragging = true;
+      fan.picked = true;
+      fan.pickT = 0;
+      drag.pickX = fan.x; drag.pickY = fan.y;
+      drag.dx = p.x - fan.x;
+      drag.dy = p.y - fan.y;
+      ck.target = null;     // 拖拽中禁止走路
+      AUDIO.play('pickup');
+      burst(p.x, p.y, 8, [fanSpec(fan.fan).color, '#FFFFFF'], 2.5, 20);
+      return;
+    }
+    // 2. PLAY: 点空槽 → 一键装上最近的"正确颜色"风扇（保底路径）
+    const slot = findSlotAtPoint(p.x, p.y);
+    if (slot){
+      const correct = spawnFans.find(f => f.fan === slot.expectFan && !f.dragging);
+      if (correct){
+        // 动画：飞到槽位
+        correct.dragging = true;
+        correct.picked = true;
+        correct.targetX = slot.x;
+        correct.targetY = slot.y;
+        correct.installAnim = 0;
+        tryInstallFan(correct, slot);
+        return;
+      }
+    }
+    // 3. 走路（点哪走哪）
+    ck.target = { x: p.x, y: p.y };
+    ck.moving = true;
+    idleT = 0;
+    return;
+  }
+  // 4. FREE: 自由点击水杯 / 马桶 / 床 / tab
+  if (state === S.FREE){
+    // 床（说晚安）
+    if (activeRoom === 'bedroom'){
+      const bed = FREE_OBJECTS.bedSleep;
+      if (dst({x:p.x,y:p.y}, bed) <= bed.r){
+        enterCutscene(S.GOODNIGHT, 180);
+        ck.x = bed.x; ck.y = bed.y - 10;
+        ck.vx = 0; ck.vy = 0; ck.target = null;
+        ck.asleep = true;
+        AUDIO.play('zzz');
+        setTimeout(() => say('晚安，小鸡睡啦', true), 200);
+        return;
+      }
+    }
+    // 水杯（厨房）
+    if (activeRoom === 'kitchen'){
+      const w = FREE_OBJECTS.water;
+      if (!w.placed && dst({x:p.x,y:p.y}, w) <= w.r){
+        w.placed = true;
+        AUDIO.play('water');
+        burst(w.x, w.y, 14, ['#FFFFFF', '#A5D8FF', '#7FD8F0'], 3, 30);
+        floaters.push({ x: w.x, y: w.y - 30, txt: '💧', life: 40 });
+        say('咕嘟咕嘟，喝水啦', true);
+        setTimeout(() => {
+          floaters.push({ x: w.x, y: w.y - 50, txt: '☺️', life: 50 });
+          say('喝完啦！', true);
+        }, 1400);
+        return;
+      }
+    }
+    // 马桶（卧室）
+    if (activeRoom === 'bedroom'){
+      const t = FREE_OBJECTS.toilet;
+      if (!t.placed && dst({x:p.x,y:p.y}, t) <= t.r){
+        t.placed = true;
+        AUDIO.play('cheer');
+        burst(t.x, t.y, 14, ['#FFE066', '#FFFFFF', '#9BE7B8'], 3, 30);
+        floaters.push({ x: t.x, y: t.y - 30, txt: '🚽', life: 40 });
+        say('尿尿啦～', true);
+        setTimeout(() => {
+          floaters.push({ x: t.x, y: t.y - 50, txt: '😊', life: 50 });
+          say('尿完啦～', true);
+        }, 1200);
+        return;
+      }
+    }
+    // FREE 态走路
+    ck.target = { x: p.x, y: p.y };
+    ck.moving = true;
+    idleT = 0;
+    return;
+  }
+}, { passive:false });
+
+window.addEventListener('pointermove', ev => {
+  if (ev.pointerId !== drag.pointerId) return;
+  const p = toCanvasPoint(ev);
+  drag.px = p.x; drag.py = p.y;
+  if (!drag.active) return;
+  const f = drag.fan;
+  if (!f) return;
+  // 磁吸到最近的未装槽（拖拽吸附）
+  let best = null, bd = Infinity;
+  for (const s of SLOTS[activeRoom]){
+    if (s.state === 'success') continue;
+    const d = dst({x:p.x,y:p.y}, s);
+    if (d < bd){ bd = d; best = s; }
+  }
+  const sR = assist ? SNAP_R_ASSIST : SNAP_R;
+  if (best && bd < sR){
+    f.x = lerp(f.x, best.x, 0.35);
+    f.y = lerp(f.y, best.y, 0.35);
+    drag.hoverSlot = best;
+  } else {
+    f.x = p.x - drag.dx;
+    f.y = p.y - drag.dy;
+    drag.hoverSlot = null;
+  }
+});
+
+function endDrag(ev, type){
+  if (ev.pointerId !== drag.pointerId) return;
+  const wasActive = drag.active;
+  const f = drag.fan;
+  const slot = drag.hoverSlot;
+  drag.active = false;
+  drag.pointerId = null;
+  drag.hoverSlot = null;
+  try{ canvas.releasePointerCapture(ev.pointerId); }catch(e){}
+  if (!wasActive || !f){ drag.fan = null; return; }
+  f.dragging = false;
+  drag.fan = null;
+  if (type === 'cancel'){
+    // 系统打断：放回 spawn 点
+    snapBackFan(f);
+    return;
+  }
+  // 释放
+  if (slot && dst({x:f.x,y:f.y}, slot) < slot.r * 1.2){
+    // 验证颜色
+    if (f.fan === slot.expectFan){
+      tryInstallFan(f, slot);
+    } else {
+      // 颜色错：柔性回弹
+      snapBackFan(f);
+      floaters.push({ x: f.x, y: f.y - 30, txt: '🙂', life: 40 });
+      say('再试一次', false);
+    }
+  } else {
+    // 没到槽位：放回 spawn
+    snapBackFan(f);
+  }
+}
+
+window.addEventListener('pointerup',     ev => endDrag(ev, 'up'));
+window.addEventListener('pointercancel', ev => endDrag(ev, 'cancel'));
+window.addEventListener('blur', () => {
+  if (drag.active && drag.fan){
+    drag.fan.dragging = false;
+    snapBackFan(drag.fan);
+    drag.fan = null; drag.active = false; drag.pointerId = null;
+  }
+});
+
+// 静音按钮
+const muteBtn = document.getElementById('muteBtn');
+muteBtn.addEventListener('click', () => {
+  unlockAV();
+  AUDIO.setMuted(!AUDIO.isMuted());
+  Save.data.muted = AUDIO.isMuted();
+  Save.write();
+  muteBtn.textContent = AUDIO.isMuted() ? '🔇' : '🔊';
+});
+muteBtn.textContent = AUDIO.isMuted() ? '🔇' : '🔊';
+
+// 开始按钮（点屏幕触发 unlockAV）
+document.getElementById('btnStart').addEventListener('click', () => {
+  unlockAV();
+  AUDIO.setMuted(!!Save.data.muted);
+  muteBtn.textContent = AUDIO.isMuted() ? '🔇' : '🔊';
+  document.getElementById('title').classList.remove('show');
+  startGame();
+});
+
+// iOS 手势禁缩放 + 切后台 resume
+['gesturestart','gesturechange','dblclick'].forEach(ev =>
+  document.addEventListener(ev, e => e.preventDefault(), {passive:false}));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (window.speechSynthesis){ try{ speechSynthesis.resume(); }catch(e){} }
+  AUDIO.unlock();
+});
+
+// =============================================================
+// 小鸡绘制（drawChickAt - 从 chick-ufo 移植，删 helmet）
+// =============================================================
+function drawChickAt(x, y, sc, rot, opt){
+  opt = opt || {};
+  const s = 20;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.scale(sc, sc);
+  ctx.translate(0, opt.bob || 0);
+  // 脚
+  if (!opt.asleep){
+    ctx.strokeStyle = '#FF9800'; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+    const fw = Math.sin(opt.wf || 0) * 3;
+    ctx.beginPath();
+    ctx.moveTo(-5, s*0.72); ctx.lineTo(-7 - fw, s*0.95);
+    ctx.moveTo(5, s*0.72);  ctx.lineTo(7 + fw, s*0.95);
+    ctx.stroke();
+  }
+  // 翅膀
+  const wing = Math.sin(opt.wf || 0) * (opt.wingAmp || 0.5);
+  ctx.fillStyle = '#FFD54F';
+  ctx.save(); ctx.translate(-s*0.72, -2); ctx.rotate(-0.5 - wing*0.5);
+  ctx.beginPath(); ctx.ellipse(0, 0, s*0.36, s*0.54, 0, 0, 6.28); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.translate(s*0.72, -2); ctx.rotate(0.5 + wing*0.5);
+  ctx.beginPath(); ctx.ellipse(0, 0, s*0.36, s*0.54, 0, 0, 6.28); ctx.fill(); ctx.restore();
+  // 身体
+  ctx.fillStyle = '#FFE066';
+  ctx.beginPath(); ctx.arc(0, 0, s*0.86, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = '#F5C518'; ctx.lineWidth = 1.6; ctx.stroke();
+  // 尾巴
+  ctx.fillStyle = '#FFD54F';
+  ctx.beginPath();
+  ctx.moveTo(-s*0.7, -s*0.3);
+  ctx.lineTo(-s*1.15, -s*0.75);
+  ctx.lineTo(-s*0.65, -s*0.62);
+  ctx.closePath(); ctx.fill();
+  // 冠
+  ctx.fillStyle = '#FF5252';
+  for (let i=0;i<3;i++){
+    ctx.beginPath(); ctx.arc(-6 + i*6, -s*0.88, 3.4 - i*0.4, 0, 6.28); ctx.fill();
+  }
+  // 眼睛
+  if (opt.asleep){
+    ctx.strokeStyle = '#4E342E'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(-5, -4, 4, 0.35, Math.PI-0.35); ctx.stroke();
+    ctx.beginPath(); ctx.arc(6, -4, 4, 0.35, Math.PI-0.35); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#3E2723';
+    ctx.beginPath(); ctx.arc(-5, -5, 4, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -5, 4, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-3.6, -6.4, 1.5, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.arc(7.4, -6.4, 1.5, 0, 6.28); ctx.fill();
+  }
+  // 嘴
+  ctx.fillStyle = '#FF9800';
+  ctx.beginPath();
+  ctx.moveTo(-4, 1); ctx.lineTo(6, 1); ctx.lineTo(1, 7);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// =============================================================
+// 风扇绘制
+// =============================================================
+function drawFanAt(spec, x, y, bladeRot, scale, alpha){
+  alpha = (alpha === undefined) ? 1 : alpha;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha = alpha;
+  ctx.scale(scale, scale);
+  // ① 电源线（先画，藏在最底）
+  if (spec.cordLen > 0){
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(spec.s*0.30, spec.s*0.55);
+    ctx.bezierCurveTo(
+      spec.s*0.70, spec.s*0.95,
+      spec.s*0.45, spec.cordLen*0.5,
+      spec.s*0.20, spec.cordLen
+    );
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(spec.s*0.20, spec.cordLen, 2.2, 0, 6.28); ctx.fill();
+  }
+  // ② 杆 / 底座
+  if (spec.hasPole){
+    ctx.strokeStyle = spec.accent;
+    ctx.lineWidth = spec.s * 0.20;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, -spec.s*0.4);
+    ctx.lineTo(0, spec.s*1.7);
+    ctx.stroke();
+    ctx.fillStyle = spec.accent;
+    ctx.beginPath();
+    ctx.ellipse(0, spec.s*1.78, spec.s*0.95, spec.s*0.22, 0, 0, 6.28);
+    ctx.fill();
+  } else if (spec.hasBase){
+    ctx.fillStyle = spec.accent;
+    ctx.beginPath();
+    ctx.ellipse(0, spec.s*0.45, spec.s*0.75, spec.s*0.20, 0, 0, 6.28);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(0, spec.s*0.40, spec.s*0.55, spec.s*0.08, 0, 0, 6.28);
+    ctx.fill();
+  }
+  // ③ 头部
+  ctx.save();
+  ctx.translate(0, -spec.s * 0.55);
+  // 网罩
+  ctx.strokeStyle = spec.accent;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, spec.s * 1.1, 0, Math.PI*2); ctx.stroke();
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 6; i++){
+    const a = i * Math.PI / 3 + Math.PI / 6;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*spec.s*0.22, Math.sin(a)*spec.s*0.22);
+    ctx.lineTo(Math.cos(a)*spec.s*1.1,  Math.sin(a)*spec.s*1.1);
+    ctx.stroke();
+  }
+  // 叶片
+  ctx.save();
+  ctx.rotate(bladeRot);
+  ctx.fillStyle = spec.color;
+  for (let i = 0; i < spec.blades; i++){
+    const a = i * Math.PI * 2 / spec.blades;
+    ctx.save(); ctx.rotate(a);
+    ctx.beginPath();
+    ctx.ellipse(spec.s * 0.55, 0, spec.bladeLen, spec.bladeWid, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(spec.s * 0.55, -spec.bladeWid*0.3, spec.bladeLen*0.7, spec.bladeWid*0.4, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = spec.color;
+    ctx.restore();
+  }
+  ctx.restore();
+  // hub
+  ctx.fillStyle = spec.accent;
+  ctx.beginPath(); ctx.arc(0, 0, spec.s * 0.30, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath(); ctx.arc(-spec.s*0.07, -spec.s*0.07, spec.s*0.12, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+
+// =============================================================
+// 家具绘制
+// =============================================================
+function drawFurniture(f){
+  switch(f.type){
+    case 'sofa': {
+      rrect(f.x, f.y, f.w, f.h, 12); ctx.fillStyle = f.color; ctx.fill();
+      const cw = f.w / 3;
+      for (let i=0;i<3;i++){
+        rrect(f.x + cw*i + 4, f.y + 10, cw - 8, f.h - 20, 6);
+        ctx.fillStyle = f.cushion; ctx.fill();
+      }
+      rrect(f.x + 6, f.y + 2, f.w - 12, 16, 8); ctx.fillStyle = f.color; ctx.fill();
+      break;
+    }
+    case 'bed': {
+      rrect(f.x, f.y, f.w, f.h, 12); ctx.fillStyle = f.frame; ctx.fill();
+      rrect(f.x + 6, f.y + 18, f.w - 12, f.h - 24, 8); ctx.fillStyle = f.sheets; ctx.fill();
+      rrect(f.x + 6, f.y + 18, f.w - 12, 8, 4); ctx.fillStyle = f.color; ctx.fill();
+      for (let i=0;i<2;i++){
+        rrect(f.x + 14 + i*90, f.y + 30, 80, 36, 8);
+        ctx.fillStyle = '#FFFFFF'; ctx.fill();
+        ctx.strokeStyle = f.color; ctx.lineWidth = 2; ctx.stroke();
+      }
+      break;
+    }
+    case 'nightstand': {
+      rrect(f.x, f.y, f.w, f.h, 6); ctx.fillStyle = f.color; ctx.fill();
+      rrect(f.x, f.y, f.w, 10, 6); ctx.fillStyle = f.top; ctx.fill();
+      ctx.fillStyle = f.top;
+      ctx.beginPath(); ctx.arc(f.x + f.w/2, f.y + f.h/2 + 4, 3, 0, Math.PI*2); ctx.fill();
+      break;
+    }
+    case 'tv': {
+      rrect(f.x, f.y, f.w, f.h, 6); ctx.fillStyle = f.color; ctx.fill();
+      rrect(f.x + 8, f.y + 6, f.w - 16, f.h - 12, 4); ctx.fillStyle = f.screen; ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath();
+      ctx.moveTo(f.x + 12, f.y + 10);
+      ctx.lineTo(f.x + f.w/3, f.y + 10);
+      ctx.lineTo(f.x + 18, f.y + f.h/2);
+      ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'counter': {
+      rrect(f.x, f.y + 14, f.w, f.h - 14, 6); ctx.fillStyle = f.color; ctx.fill();
+      rrect(f.x, f.y, f.w, 18, 4); ctx.fillStyle = f.top; ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      rrect(f.x + 6, f.y + 2, f.w - 12, 4, 2); ctx.fill();
+      break;
+    }
+    case 'fridge': {
+      rrect(f.x, f.y, f.w, f.h, 6); ctx.fillStyle = f.color; ctx.fill();
+      rrect(f.x + 4, f.y + 4, f.w - 8, f.h * 0.55, 4); ctx.fillStyle = f.door; ctx.fill();
+      rrect(f.x + 4, f.y + f.h * 0.62, f.w - 8, f.h * 0.34, 4); ctx.fillStyle = f.door; ctx.fill();
+      ctx.fillStyle = '#888';
+      ctx.fillRect(f.x + f.w - 12, f.y + 24, 3, f.h * 0.46);
+      ctx.fillRect(f.x + f.w - 12, f.y + f.h * 0.66, 3, f.h * 0.28);
+      break;
+    }
+    case 'table': {
+      ctx.fillStyle = f.color;
+      for (const [dx, dy] of [[2, f.h-10],[f.w-10, f.h-10],[2, 14],[f.w-10, 14]]){
+        ctx.fillRect(f.x + dx, f.y + dy, 8, 8);
+      }
+      rrect(f.x, f.y, f.w, 16, 4); ctx.fillStyle = f.top; ctx.fill();
+      rrect(f.x + 8, f.y + 3, f.w - 16, 4, 2); ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fill();
+      break;
+    }
+    case 'plant': {
+      ctx.fillStyle = f.color;
+      for (const [dx, dy, rx, ry] of [[-10, 32, 22, 14], [10, 26, 20, 12], [0, 14, 22, 14]]){
+        ctx.beginPath();
+        ctx.ellipse(f.x + f.w/2 + dx, f.y + dy, rx, ry, 0, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.fillStyle = f.leaves;
+      for (const [dx, dy, r] of [[-6, 22, 7], [6, 18, 6], [12, 30, 6]]){
+        ctx.beginPath();
+        ctx.ellipse(f.x + f.w/2 + dx, f.y + dy, r, r*0.55, 0, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#D9704A';
+      ctx.beginPath();
+      ctx.moveTo(f.x + 8, f.y + f.h - 30);
+      ctx.lineTo(f.x + f.w - 8, f.y + f.h - 30);
+      ctx.lineTo(f.x + f.w - 14, f.y + f.h - 4);
+      ctx.lineTo(f.x + 14, f.y + f.h - 4);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#B85030';
+      ctx.fillRect(f.x + 6, f.y + f.h - 32, f.w - 12, 4);
+      break;
+    }
+    case 'rug': {
+      ctx.fillStyle = f.color;
+      ctx.beginPath();
+      ctx.ellipse(f.x + f.w/2, f.y + f.h/2, f.w/2, f.h/2, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = f.pattern;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(f.x + f.w/2, f.y + f.h/2, f.w/2 - 6, f.h/2 - 4, 0, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(f.x + f.w/2, f.y + f.h/2, f.w/4, f.h/4, 0, 0, Math.PI*2);
+      ctx.stroke();
+      break;
+    }
+  }
+}
+
+// 背景剪影风扇
+function drawDecoFan(d){
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.globalAlpha = d.a;
+  ctx.fillStyle = '#FFFFFF';
+  for (let i=0;i<3;i++){
+    const a = i * Math.PI * 2 / 3 + frame * 0.012;
+    ctx.save(); ctx.rotate(a);
+    ctx.beginPath();
+    ctx.ellipse(d.s * 0.55, 0, d.s * 1.05, d.s * 0.35, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = d.a * 0.7;
+  ctx.beginPath(); ctx.arc(0, 0, d.s * 0.4, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// 房间背景
+function drawRoomBackground(room){
+  ctx.fillStyle = room.bg;
+  ctx.fillRect(0, HUD_H, W, PLAYFIELD_BOTTOM - HUD_H);
+  // 上方墙裙
+  ctx.fillStyle = room.wall;
+  ctx.fillRect(0, HUD_H, W, 32);
+  // 地板
+  ctx.fillStyle = room.floor;
+  ctx.fillRect(0, 360, W, PLAYFIELD_BOTTOM - 360);
+  // 木纹
+  ctx.strokeStyle = room.accent + '55';
+  ctx.lineWidth = 1;
+  for (let y = 380; y < PLAYFIELD_BOTTOM; y += 50){
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // 房间名 pill
+  ctx.fillStyle = 'rgba(255,255,255,0.78)';
+  rrect(16, HUD_H + 14, 110, 36, 18); ctx.fill();
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillStyle = room.accent;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(room.name, 71, HUD_H + 33);
+}
+
+// 槽位绘制
+function drawSlot(s){
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  let ringColor, dashSpeed, fillAlpha;
+  if (s.state === 'idle'){
+    ringColor = 'rgba(80,80,80,0.55)'; dashSpeed = 0.05; fillAlpha = 0.18;
+  } else if (s.state === 'ready'){
+    ringColor = 'rgba(255,200,80,0.9)'; dashSpeed = 0.18; fillAlpha = 0.32;
+  } else {
+    ringColor = 'rgba(80,200,120,1.0)'; dashSpeed = 0; fillAlpha = 0.0;
+  }
+  ctx.strokeStyle = ringColor;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 6]);
+  ctx.lineDashOffset = -frame * dashSpeed;
+  ctx.beginPath(); ctx.arc(0, 0, s.r, 0, Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+  // 内填充
+  if (fillAlpha > 0){
+    const c = s.expectColor;
+    const r = parseInt(c.slice(1,3),16), g = parseInt(c.slice(3,5),16), b = parseInt(c.slice(5,7),16);
+    ctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
+    ctx.beginPath(); ctx.arc(0, 0, s.r * 0.62, 0, Math.PI*2); ctx.fill();
+  }
+  // 中心色标
+  ctx.fillStyle = s.expectColor;
+  ctx.beginPath(); ctx.arc(0, 0, s.r * 0.30, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.beginPath(); ctx.arc(-s.r*0.07, -s.r*0.07, s.r*0.10, 0, Math.PI*2); ctx.fill();
+  // success 装饰
+  if (s.state === 'success'){
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-s.r*0.16, 0);
+    ctx.lineTo(-s.r*0.05, s.r*0.14);
+    ctx.lineTo(s.r*0.22, -s.r*0.12);
+    ctx.stroke();
+    for (let i=0;i<5;i++){
+      const a = i * Math.PI * 2 / 5 + frame * 0.02;
+      const r2 = s.r * 1.35;
+      ctx.fillStyle = '#FFD35C';
+      ctx.beginPath();
+      ctx.arc(Math.cos(a)*r2, Math.sin(a)*r2, 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// 自由玩对象
+function drawFreeObject(obj){
+  const fontSize = Math.round(obj.r * 1.7);
+  // 呼吸光晕
+  const glow = 0.18 + Math.sin(frame * 0.05) * 0.07;
+  ctx.save();
+  ctx.translate(obj.x, obj.y);
+  ctx.fillStyle = `rgba(255,235,180,${obj.placed ? 0.05 : glow})`;
+  ctx.beginPath(); ctx.arc(0, 0, obj.r * 1.35, 0, Math.PI*2); ctx.fill();
+  ctx.font = `${fontSize}px serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const glyph =
+    obj.type === 'water'     ? '🥛' :
+    obj.type === 'toilet'    ? '🚽' :
+    /* bed-sleep */            '🛏️';
+  ctx.fillText(glyph, 0, 2);
+  if (obj.type === 'bed-sleep'){
+    // 床图标下方加一行"点这里睡觉"小字提示
+    ctx.font = '16px sans-serif'; ctx.fillStyle = '#8A7250';
+    ctx.fillText('点这里睡觉', 0, obj.r * 1.1);
+  }
+  ctx.restore();
+}
+
+// 房间 tab
+function drawRoomTabs(activeId){
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  ctx.fillRect(0, PLAYFIELD_BOTTOM, W, TABS_H);
+  ctx.strokeStyle = '#E6D7C2';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, PLAYFIELD_BOTTOM); ctx.lineTo(W, PLAYFIELD_BOTTOM); ctx.stroke();
+  for (const tab of ROOM_TABS){
+    const active = tab.id === activeId;
+    rrect(tab.x - tab.w/2, tab.y - tab.h/2, tab.w, tab.h, 18);
+    ctx.fillStyle   = active ? '#FFD35C' : '#FFFFFF';
+    ctx.fill();
+    ctx.strokeStyle = active ? '#E8B660' : '#E6D7C2';
+    ctx.lineWidth = 3; ctx.stroke();
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillStyle = active ? '#FFFFFF' : '#8A7460';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(tab.label, tab.x, tab.y);
+  }
+}
+
+// HUD（顶部 72px）
+function drawHud(){
+  ctx.fillStyle = 'rgba(0,0,0,0.40)'; ctx.fillRect(0, 0, W, HUD_H);
+  // 左：标题 chip
+  ctx.fillStyle = 'rgba(255,255,255,0.86)';
+  rrect(12, 12, 180, 48, 24); ctx.fill();
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillStyle = '#E4453A';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('帮小鸡装风扇', 102, 36);
+  // 中：进度
+  ctx.fillStyle = 'rgba(255,255,255,0.86)';
+  rrect(W/2 - 60, 12, 120, 48, 24); ctx.fill();
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillStyle = '#4A3722';
+  ctx.fillText('已装', W/2 - 30, 30);
+  // 数字（用 chick 黄圆角 chip）
+  ctx.fillStyle = '#FFD35C';
+  rrect(W/2 + 6, 18, 48, 36, 18); ctx.fill();
+  ctx.fillStyle = '#4A3722';
+  ctx.fillText(String(installedCount), W/2 + 30, 36);
+  ctx.fillText('/ 6', W/2 + 70, 36);
+}
+
+// 竖屏提示
+function drawRotateHint(){
+  ctx.fillStyle = '#FFFBEC'; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const cx = W/2, cy = H/2 - 30;
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(Math.sin(frame * 0.03) * 0.4 - 0.5);
+  ctx.fillStyle = '#ECEFF1';
+  rrect(-38, -66, 76, 132, 12); ctx.fill();
+  ctx.fillStyle = '#FFD35C';
+  rrect(-32, -56, 64, 112, 8); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = '#E8B660'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, cy, 108, -Math.PI*0.75, Math.PI*0.35); ctx.stroke();
+  ctx.fillStyle = '#E8B660';
+  const ea = Math.PI*0.35;
+  ctx.save();
+  ctx.translate(cx + Math.cos(ea)*108, cy + Math.sin(ea)*108);
+  ctx.rotate(ea + Math.PI/2);
+  ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(13,12); ctx.lineTo(-13,12); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#4A3722'; ctx.font = 'bold 26px "Microsoft YaHei"';
+  ctx.fillText('把手机横过来', cx, cy + 160);
+  ctx.font = '19px "Microsoft YaHei"'; ctx.fillStyle = 'rgba(74,55,34,0.7)';
+  ctx.fillText('转一下就好啦', cx, cy + 196);
+}
+
+function isPortrait(){ return window.innerHeight > window.innerWidth * 1.15; }
+
+// =============================================================
+// 移动（指哪走哪）
+// =============================================================
+function moveChick(){
+  if (drag.active){ ck.target = null; }
+  if (ck.target){
+    const dx = ck.target.x - ck.x, dy = ck.target.y - ck.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 12){ ck.target = null; }
+    else { ck.vx += dx/d * ACC; ck.vy += dy/d * ACC; }
+  }
+  // 软墙
+  if (ck.x < MARGIN) ck.vx += (MARGIN - ck.x) * WALLK;
+  if (ck.x > W - MARGIN) ck.vx -= (ck.x - (W - MARGIN)) * WALLK;
+  if (ck.y < MARGIN + HUD_H) ck.vy += (MARGIN + HUD_H - ck.y) * WALLK;
+  if (ck.y > PLAYFIELD_BOTTOM - MARGIN) ck.vy -= (ck.y - (PLAYFIELD_BOTTOM - MARGIN)) * WALLK;
+  ck.vx *= DAMP; ck.vy *= DAMP;
+  const sp = Math.hypot(ck.vx, ck.vy);
+  if (sp > MAXV){ ck.vx = ck.vx / sp * MAXV; ck.vy = ck.vy / sp * MAXV; }
+  ck.x += ck.vx; ck.y += ck.vy;
+  ck.x = clp(ck.x, 16, W - 16);
+  ck.y = clp(ck.y, HUD_H + 16, PLAYFIELD_BOTTOM - 16);
+  // 姿态
+  if (Math.abs(ck.vx) > 0.3) ck.dir = ck.vx > 0 ? 0 : 1;
+  ck.rot = lerp(ck.rot, clp(ck.vx * 0.02, -0.25, 0.25), 0.08);
+  ck.wf += (Math.abs(ck.vx) + Math.abs(ck.vy) > 0.5) ? 0.10 : 0.05;
+  ck.bob = Math.sin(frame * 0.03) * 3;
+  if (ck.inv > 0) ck.inv--;
+}
+
+// 更新拖拽中的风扇
+function updateSpawnFans(){
+  for (const f of spawnFans){
+    f.bladeRot += fanSpec(f.fan).speed;
+    // 安装动画（点空槽的保底路径）
+    if (f.installAnim !== undefined){
+      f.installAnim += 1;
+      f.x = lerp(f.x, f.targetX, 0.30);
+      f.y = lerp(f.y, f.targetY, 0.30);
+      continue;
+    }
+    // 拾起后的等待
+    if (f.picked && !f.dragging){
+      f.pickT++;
+      if (f.pickT > 150){
+        f.picked = false;
+        f.pickT = 0;
+        snapBackFan(f);
+      }
+    }
+    // 飞回 spawn
+    if (f.snapping){
+      f.snapT = (f.snapT || 0) + 1;
+      f.x = lerp(f.x, f.targetX, 0.30);
+      f.y = lerp(f.y, f.targetY, 0.30);
+      if (dst({x:f.x,y:f.y}, {x:f.targetX,y:f.targetY}) < 2){
+        f.snapping = false;
+        f.x = f.targetX; f.y = f.targetY;
+        f.picked = false;
+      }
+    }
+  }
+}
+
+// 渐进 assist 三档（idle 4s/8s/12s）
+function updateAssist(){
+  if (state !== S.PLAY) return;
+  idleT++;
+  if (idleT > 720) assist = true;       // 12s 放大吸附
+  // 8s 时弹一次 "找同色风扇"
+  if (idleT === 480){
+    const remain = spawnFans.length;
+    if (remain > 0) say('找找风扇，拖到同色圈圈里', false);
+  }
+  // 4s 时空槽呼吸加强（slot 状态机里处理）
+}
+
+// 智能找最近未装的"正确颜色"风扇（assist 用）
+function nearestCorrectFan(slot){
+  let best = null, bd = 1e9;
+  for (const f of spawnFans){
+    if (f.dragging) continue;
+    if (f.fan !== slot.expectFan) continue;
+    const d = dst({x:f.x,y:f.y}, slot);
+    if (d < bd){ bd = d; best = f; }
+  }
+  return best;
+}
+
+// =============================================================
+// 状态机分发
+// =============================================================
+function update(){
+  frame++;
+  cs.t++;
+  // TITLE / 静止帧
+  if (state === S.TITLE){
+    stepParticles();
+    return;
+  }
+  // INTRO 过场
+  if (state === S.INTRO){
+    stepParticles();
+    if (cs.t >= cs.T){ enterCutscene(S.PLAY, 0); }
+    return;
+  }
+  // BUILD 过场（6 台风扇全装好后）
+  if (state === S.BUILD){
+    if (cs.t === 30){
+      // 让所有已装风扇同时大幅旋转
+      for (const r of Object.keys(SLOTS)){
+        for (const s of SLOTS[r]){
+          if (s.state === 'success' && s.installedBy){
+            s.installedBy.bladeRot = 0;
+          }
+        }
+      }
+      burst(W/2, H/2 - 40, 36, ['#FFD35C', '#FFFFFF', '#9BE7B8', '#7FD8F0', '#FFC2A8'], 5, 40);
+      AUDIO.play('cheer');
+      say('风扇都装好啦！', true);
+    }
+    if (cs.t >= cs.T){ enterCutscene(S.SLEEP, 210); }
+    stepParticles();
+    return;
+  }
+  // SLEEP 过场（小鸡上床睡）
+  if (state === S.SLEEP){
+    moveChick();
+    if (cs.t === 1){
+      say('小鸡要睡觉啦，不热啦', true);
+      ck.asleep = true;
+      AUDIO.play('zzz');
+      // 移到床边
+      const bed = FREE_OBJECTS.bedSleep;
+      ck.x = lerp(ck.x, bed.x, 0.4);
+      ck.y = lerp(ck.y, bed.y + 20, 0.4);
+    }
+    if (cs.t >= cs.T){ enterCutscene(S.WAKE, 120); }
+    stepParticles();
+    return;
+  }
+  // WAKE 过场
+  if (state === S.WAKE){
+    if (cs.t === 30){
+      ck.asleep = false;
+      ck.x = 250; ck.y = 400;
+      say('早上好！不热啦！', true);
+      AUDIO.play('good');
+    }
+    if (cs.t >= cs.T){
+      enterCutscene(S.FREE, 0);
+      // 刷新自由玩物件可见性
+      const w = FREE_OBJECTS.water; w.placed = false;
+      const t = FREE_OBJECTS.toilet; t.placed = false;
+      say('自由玩吧！', true);
+    }
+    stepParticles();
+    return;
+  }
+  // FREE 自由玩
+  if (state === S.FREE){
+    moveChick();
+    updateSpawnFans();
+    updateAssist();
+    stepParticles();
+    return;
+  }
+  // GOODNIGHT 过场（自由玩里说晚安）
+  if (state === S.GOODNIGHT){
+    moveChick();
+    if (cs.t >= cs.T){
+      // 回标题
+      state = S.TITLE;
+      document.getElementById('title').classList.add('show');
+      resetGame();
+    }
+    stepParticles();
+    return;
+  }
+  // PLAY
+  if (state === S.PLAY){
+    moveChick();
+    updateSpawnFans();
+    updateAssist();
+    stepParticles();
+    return;
+  }
+}
+
+// =============================================================
+// 渲染分发
+// =============================================================
+function draw(){
+  const room = ROOMS.find(r => r.id === activeRoom);
+  // 房间背景
+  drawRoomBackground(room);
+  // deco 风扇
+  for (const d of DECO_FANS[activeRoom]) drawDecoFan(d);
+  // 家具
+  for (const f of FURNITURE[activeRoom]) drawFurniture(f);
+  // 槽位
+  for (const s of SLOTS[activeRoom]){
+    if (s.state === 'ready') continue; // 拖拽中的吸附高亮见 hoverSlot
+    drawSlot(s);
+  }
+  // 拖拽中吸附到槽的高亮
+  if (drag.hoverSlot && drag.fan){
+    const s = drag.hoverSlot;
+    if (drag.fan.fan === s.expectFan){
+      drawSlot({ ...s, state: 'ready' });
+    } else {
+      drawSlot({ ...s, state: 'idle' });
+    }
+  }
+  // 自由玩物件
+  if (state === S.FREE){
+    for (const k of Object.keys(FREE_OBJECTS)){
+      const o = FREE_OBJECTS[k];
+      if (o.room === activeRoom) drawFreeObject(o);
+    }
+  }
+  // 待拖风扇（在 ground 上）
+  for (const f of spawnFans){
+    if (drag.fan === f) continue;  // 拖拽中单独画
+    const spec = fanSpec(f.fan);
+    // 拾起但未装：呼吸光晕 + ▼ 箭头 + 准星
+    if (f.picked && !f.dragging){
+      const gl = 0.18 + Math.sin(frame * 0.10) * 0.10;
+      ctx.fillStyle = `rgba(255,220,80,${gl})`;
+      ctx.beginPath(); ctx.arc(f.x, f.y, spec.s * 1.7, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = `rgba(255,180,40,${0.4 + Math.sin(frame*0.10)*0.3})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.lineDashOffset = -frame * 0.1;
+      ctx.beginPath(); ctx.arc(f.x, f.y, spec.s * 2.0, 0, Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      // ▼ 箭头朝最近空槽
+      let nearest = null, bd = 1e9;
+      for (const s of SLOTS[activeRoom]){
+        if (s.state === 'success') continue;
+        if (s.expectFan !== f.fan) continue;
+        const dd = dst({x:f.x,y:f.y}, s);
+        if (dd < bd){ bd = dd; nearest = s; }
+      }
+      if (nearest && bd > spec.s * 2.5){
+        const a = Math.atan2(nearest.y - f.y, nearest.x - f.x);
+        const dist = spec.s * 2.6;
+        for (let k = 0; k < 3; k++){
+          const r = dist + k * 16;
+          ctx.fillStyle = 'rgba(228,69,58,0.7)';
+          ctx.beginPath();
+          ctx.moveTo(f.x + Math.cos(a)*r + Math.cos(a+1.4)*8,
+                     f.y + Math.sin(a)*r + Math.sin(a+1.4)*8);
+          ctx.lineTo(f.x + Math.cos(a)*r, f.y + Math.sin(a)*r);
+          ctx.lineTo(f.x + Math.cos(a)*r + Math.cos(a-1.4)*8,
+                     f.y + Math.sin(a)*r + Math.sin(a-1.4)*8);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+      // 中心 🎯 emoji
+      ctx.font = `${Math.round(spec.s * 0.9)}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🎯', f.x, f.y);
+    }
+    drawFanAt(spec, f.x, f.y, f.bladeRot, 1, 1);
+  }
+  // 拖拽中的风扇（抬高一档视觉）
+  if (drag.fan){
+    const f = drag.fan;
+    const spec = fanSpec(f.fan);
+    drawFanAt(spec, f.x, f.y - 8, f.bladeRot, 1.10, 1);
+    // 手指圈
+    ctx.strokeStyle = drag.hoverSlot && drag.fan.fan === drag.hoverSlot.expectFan
+      ? 'rgba(255,200,80,0.85)' : 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(drag.px, drag.py, 22, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = drag.hoverSlot && drag.fan.fan === drag.hoverSlot.expectFan
+      ? 'rgba(255,200,80,0.95)' : 'rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.arc(drag.px, drag.py, 5, 0, Math.PI*2); ctx.fill();
+  }
+  // 已装的风扇（在槽位上旋转）
+  for (const r of Object.keys(SLOTS)){
+    for (const s of SLOTS[r]){
+      if (s.state !== 'success' || !s.installedBy) continue;
+      const spec = fanSpec(s.installedBy.fan);
+      drawFanAt(spec, s.x, s.y, s.installedBy.bladeRot, 1, 1);
+    }
+  }
+  // 小鸡
+  drawChickAt(ck.x, ck.y, 1, ck.rot, { wf: ck.wf, bob: ck.bob, asleep: ck.asleep });
+  // 粒子
+  for (const t of trail){
+    ctx.fillStyle = `rgba(255,230,120,${t.life/22*0.32})`;
+    ctx.beginPath(); ctx.arc(t.x, t.y, 5, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  for (const p of particles){
+    ctx.globalAlpha = clp(p.life / 30, 0, 1) * 0.95;
+    ctx.fillStyle = p.clr;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  for (const f of floaters){
+    ctx.globalAlpha = clp(f.life / 40, 0, 1);
+    ctx.font = '26px serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(f.txt, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+  // HUD
+  drawHud();
+  // Tabs
+  drawRoomTabs(activeRoom);
+}
+
+// =============================================================
+// 主循环（固定步长 · 单 rAF · 页面不可见时暂停）
+// =============================================================
+let acc = 0, last = 0, loopRaf = 0;
+function loop(t){
+  // 唯一的一处 rAF 续帧：保证任何时候只有一个主循环在跑
+  loopRaf = requestAnimationFrame(loop);
+  if (!last) last = t;
+  let dt = t - last; last = t;
+  if (dt > 100) dt = 100;
+  if (isPortrait()){
+    acc = 0;
+    drawRotateHint();
+    return;
+  }
+  acc += dt;
+  let n = 0;
+  while (acc >= 16.667 && n < 3){
+    update();
+    acc -= 16.667; n++;
+  }
+  if (n === 3) acc = 0;
+  draw();
+}
+/* last=0 → 下一帧重新取时间基准，避免后台回来时瞬间补一堆帧 */
+function startLoop(){ if (!loopRaf){ last = 0; acc = 0; loopRaf = requestAnimationFrame(loop); } }
+function stopLoop(){ if (loopRaf){ cancelAnimationFrame(loopRaf); loopRaf = 0; } }
+
+// =============================================================
+// 启动 + 测试钩子
+// =============================================================
+// 首次启动显示音频提示
+setTimeout(() => {
+  if (!voiceReady) document.getElementById('audioHint').classList.add('show');
+}, 1500);
+
+// 测试钩子（冒烟测试用）
+window.__fan = {
+  state: () => state,
+  room: () => activeRoom,
+  installed: () => installedCount,
+  fans: () => spawnFans.length,
+  slots: () => SLOTS[activeRoom].map(s => ({ id: s.id, state: s.state })),
+  freeState: () => Object.fromEntries(Object.entries(FREE_OBJECTS).map(([k,v]) => [k, v.placed])),
+  assist: () => assist,
+  save: () => JSON.stringify(Save.data),
+  ckPos: () => ({ x: Math.round(ck.x), y: Math.round(ck.y) }),
+  reset: () => { resetGame(); enterCutscene(S.PLAY, 0); }
+};
+
+// ===== 视口自适应：等比缩放画布，保证 900×650 内容永远完整 fit =====
+// canvas 内部始终按 900×650 逻辑坐标绘制，靠 CSS scale(fit) + DPR 放大物理像素
+const wrapper = document.getElementById('gameWrapper');
+let lastFit = -1, layoutTimer = 0;
+
+/* DPR 上限锁 2：iPad/手机 3x 屏上不必按 3 倍渲染，省一半像素填充 */
+function applyDpr(fit){
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const bw = Math.max(1, Math.round(W * fit * dpr));
+  const bh = Math.max(1, Math.round(H * fit * dpr));
+  if (canvas.width !== bw || canvas.height !== bh){
+    canvas.width = bw; canvas.height = bh;   // 改尺寸会重置 transform，下面重设
+  }
+  ctx.setTransform(bw / W, 0, 0, bh / H, 0, 0);
+}
+
+function recomputeLayout(){
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  // 减去 iOS 安全区（地址栏/灵动岛/Home Indicator）
+  const cs = getComputedStyle(document.documentElement);
+  const safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  const safeBot = parseFloat(cs.getPropertyValue('--sab')) || 0;
+  const availW = vw;
+  const availH = vh - safeTop - safeBot;
+  // 等比 fit（只缩不放大）
+  const fit = Math.min(availW / W, availH / H, 1);
+  wrapper.style.transform = `scale(${fit})`;
+  // 只有 fit 真的变了才动 canvas 尺寸（改 width/height 会清空画布，代价高）
+  if (Math.abs(fit - lastFit) > 0.002){ lastFit = fit; applyDpr(fit); }
+}
+
+/* resize 节流 100ms：iPad 分屏拖动会疯狂触发 resize */
+function scheduleLayout(){
+  if (layoutTimer) return;
+  layoutTimer = setTimeout(() => { layoutTimer = 0; recomputeLayout(); }, 100);
+}
+
+recomputeLayout();
+if (window.ResizeObserver){
+  // ResizeObserver 只在尺寸真变化时回调，比 resize 事件更省
+  new ResizeObserver(scheduleLayout).observe(document.documentElement);
+}
+window.addEventListener('resize', scheduleLayout);
+window.addEventListener('orientationchange', () => { setTimeout(recomputeLayout, 200); });
+
+/* 切后台 / 来电：停掉主循环，回来再启动 */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden){
+    stopLoop();
+    if (window.speechSynthesis){ try { speechSynthesis.cancel(); } catch(e){} }
+  } else {
+    startLoop();
+  }
+});
+
+startLoop();
+</script>
+</body>
+</html>

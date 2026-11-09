@@ -1,0 +1,2938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#EAF7FF">
+<link rel="icon" href="data:,">
+<title>小鸡的彩虹可乐日</title>
+<style>
+/* ============================================================
+   1. 变量与重置
+   ============================================================ */
+:root{
+  --sky1:#EAF7FF; --sky2:#CDEEFF;
+  --cream:#FFF7E6; --cream2:#FFF1D6;
+  --grass:#A8E06A; --grass2:#8ACF52; --grass3:#74B944;
+  --dirt:#EFD6A8; --dirt2:#E0BE85;
+  --wood:#C98A55; --wood2:#A96C3C;
+  --chick:#FFD35C; --chick-belly:#FFEBB0; --chick-shade:#F8BF45; --chick-rim:#E39A2A;
+  --beak:#FF9A3C; --beak2:#EE7F1E;
+  --cola:#F0554B; --cola2:#CB3A32; --silver:#DDE3E8; --silver2:#B9C2CB;
+  --glass:#E3F4FA; --glass2:#C4E7F2; --glass-rim:#9FD3E6;
+  --drink:#8A5223; --drink2:#6E3F19;
+  --ink:#4A3728; --ink2:#8A7460;
+  --rainbow:['#FF8A6B','#FFB35C','#FFDD5C','#8FD96A','#6BC6F0','#7C9CF5','#B98CE8'];
+  --shadow:0 8px 0 rgba(74,55,40,.13);
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+          "Noto Sans CJK SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  /* 与 hub 统一的设计语言：圆角三档 + 统一缓动/时长 */
+  --r-chip:14px;
+  --r-btn:999px;
+  --r-card:28px;
+  --r-stage:22px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --dur:.22s;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  font-family:var(--font);
+  color:var(--ink);
+  background:#EAF7FF;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none; user-select:none;
+  -webkit-touch-callout:none;
+}
+button{font-family:inherit; color:inherit; border:0; background:none; cursor:pointer;}
+
+/* ============================================================
+   2. 布局
+   ============================================================ */
+#app{
+  position:fixed; inset:0;
+  min-height:100vh; min-height:100dvh;
+  display:flex; align-items:center; justify-content:center;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* 蓝天 + 底部暖奶油：和 hub 的 --bg/#FFFBEC 同色系，保持小鸡 DNA 一致 */
+  background:
+    radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, var(--sky1) 42%, var(--sky2) 100%),
+    linear-gradient(180deg, transparent 62%, #FFFBEC 100%);
+}
+.screen{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:24px; padding:20px;
+  animation:fade-in .35s ease both;
+}
+[hidden]{display:none !important;}
+@keyframes fade-in{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+
+/* ============================================================
+   3. 通用按钮
+   ============================================================ */
+.btn{
+  min-width:64px; min-height:64px;
+  display:inline-flex; align-items:center; justify-content:center; gap:10px;
+  padding:14px 30px;
+  border-radius:var(--r-btn);
+  font-size:26px; font-weight:800; letter-spacing:.02em;
+  color:#fff; background:var(--chick);
+  box-shadow:0 7px 0 var(--chick-rim), 0 12px 22px rgba(74,55,40,.16);
+  transition:transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), filter var(--dur) var(--ease);
+  touch-action:manipulation;
+}
+.btn:active{transform:translateY(5px); box-shadow:0 2px 0 var(--chick-rim), 0 6px 12px rgba(74,55,40,.16);}
+.btn.big{font-size:34px; padding:22px 48px;}
+.btn.ghost{
+  color:var(--ink); background:#fff;
+  box-shadow:0 6px 0 #E6D7C2, 0 10px 18px rgba(74,55,40,.12);
+}
+.btn.ghost:active{box-shadow:0 2px 0 #E6D7C2;}
+.btn.green{background:#8ED45C; box-shadow:0 7px 0 #63AD3C, 0 12px 22px rgba(74,55,40,.16);}
+.btn.green:active{box-shadow:0 2px 0 #63AD3C;}
+.btn.small{min-height:56px; padding:10px 20px; font-size:22px;}
+
+/* ============================================================
+   4. 标题页
+   ============================================================ */
+#screen-title{justify-content:center; gap:8px;}
+.title-art{width:min(46vh,340px); aspect-ratio:1/1;}
+.title-text{text-align:center; margin-top:-6px;}
+.title-main{
+  font-size:clamp(30px, 5.4vh, 52px); font-weight:900; letter-spacing:.02em;
+  color:var(--ink); text-shadow:0 4px 0 #fff, 0 8px 0 rgba(255,211,92,.9);
+}
+.title-sub{font-size:clamp(17px,2.6vh,24px); font-weight:700; color:var(--ink2); margin-top:12px;}
+.title-start{margin-top:26px;}
+
+/* ============================================================
+   5. 地图页
+   ============================================================ */
+#screen-map{justify-content:flex-start; gap:14px; padding:14px 16px;}
+.map-head{
+  width:100%; max-width:1180px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.map-title{font-size:clamp(22px,3.4vh,32px); font-weight:900;}
+.map-sub{font-size:clamp(15px,2.2vh,20px); font-weight:700; color:var(--ink2); margin-top:4px;}
+.map-stage-wrap{
+  width:100%; max-width:1180px; flex:1; min-height:0;
+  display:flex; align-items:center; justify-content:center;
+}
+#mapStage{width:100%; height:100%; max-height:100%;}
+.map-foot{display:flex; gap:14px; align-items:center; flex-wrap:wrap; justify-content:center;}
+.link-btn{
+  font-size:19px; font-weight:800; color:var(--ink2);
+  padding:12px 18px; border-radius:999px; min-height:56px;
+}
+.map-node{cursor:pointer;}
+.map-node .node-hit{fill:transparent;}
+.map-node .node-disc{transition:scale .18s ease;}
+.map-node:active .node-disc{scale:.94;}
+.map-node .node-body{fill:#fff; stroke:#E6D7C2; stroke-width:6;}
+.map-node.unlocked .node-body{fill:#5FBDF2; stroke:#2E8FCB;}
+.map-node.done .node-body{fill:#F6C544; stroke:#C8860B;}
+.map-node.locked .node-body{fill:#EFEAE2; stroke:#D8CFC4;}
+.map-node.locked .node-label{fill:#A99C8C;}
+.map-node .node-label{
+  font-size:27px; font-weight:900; fill:var(--ink); text-anchor:middle;
+  paint-order:stroke fill; stroke:#fff; stroke-width:7px; stroke-linejoin:round;
+}
+.map-node.unlocked .node-disc{animation:breathe 1.8s ease-in-out infinite;}
+@keyframes breathe{0%,100%{scale:1;} 50%{scale:1.07;}}
+.map-node.locked{animation:none;}
+#mapPath{fill:none; stroke:#FFFFFF; stroke-width:16; stroke-linecap:round; stroke-dasharray:4 26; opacity:.95;}
+#mapPathBase{fill:none; stroke:#DDEEF8; stroke-width:26; stroke-linecap:round;}
+
+/* ============================================================
+   6. 游戏舞台
+   ============================================================ */
+#screen-play{justify-content:flex-start; padding:0; gap:0;}
+#hud{
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 14px;
+}
+.hud-side{display:flex; gap:10px; align-items:center;}
+.hud-chip{
+  display:flex; align-items:center; gap:10px;
+  background:#fff; border-radius:999px; padding:10px 22px; min-height:56px;
+  box-shadow:0 5px 0 #E6D7C2;
+  font-size:24px; font-weight:900;
+}
+.hud-chip .lv-no{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:42px; height:42px; border-radius:50%; background:var(--chick); color:#fff; font-size:24px;
+}
+.icon-btn{
+  width:64px; height:64px; border-radius:50%; background:#fff;
+  display:inline-flex; align-items:center; justify-content:center;
+  box-shadow:0 5px 0 #E6D7C2; touch-action:manipulation;
+}
+.icon-btn:active{transform:translateY(4px); box-shadow:0 1px 0 #E6D7C2;}
+.icon-btn svg{width:34px; height:34px;}
+
+#stage-wrap{
+  flex:1; width:100%; min-height:0;
+  display:flex; align-items:center; justify-content:center; padding:0 10px;
+}
+#stage{
+  width:100%; height:100%; max-height:100%;
+  touch-action:none;
+  border-radius:var(--r-stage);
+  background:#fff;
+  box-shadow:0 10px 30px rgba(74,55,40,.10);
+}
+#hud-bottom{height:10px;}
+
+/* ============================================================
+   7. 提示层与 SVG 通用
+   ============================================================ */
+.decor{pointer-events:none;}
+.hint-pill text{
+  font-size:34px; font-weight:900; fill:var(--ink); text-anchor:middle;
+}
+.hint-pill rect{fill:#fff; stroke:#EFE3CE; stroke-width:5; rx:999;}
+.hint-pill{animation:hint-pulse 1.6s ease-in-out infinite; pointer-events:none;}
+@keyframes hint-pulse{0%,100%{translate:0 0;} 50%{translate:0 -9px;}}
+.breathe{animation:breathe 1.5s ease-in-out infinite; transform-box:fill-box; transform-origin:center;}
+.finger{animation:finger-bounce 1.2s ease-in-out infinite; pointer-events:none;}
+@keyframes finger-bounce{0%,100%{translate:0 0;} 50%{translate:10px 16px;}}
+.star-fx{pointer-events:none;}
+.star-fx.run{animation:star-pop .75s ease-out forwards;}
+@keyframes star-pop{
+  0%{opacity:1; transform:translate(var(--x),var(--y)) scale(.2) rotate(0deg);}
+  60%{opacity:1;}
+  100%{opacity:0; transform:translate(calc(var(--x) + var(--dx)), calc(var(--y) + var(--dy))) scale(1.15) rotate(var(--rot));}
+}
+.draggable{cursor:grab;}
+.draggable:active{cursor:grabbing;}
+.pop{animation:pop-it .42s cubic-bezier(.3,1.6,.5,1) both; transform-box:fill-box; transform-origin:center;}
+@keyframes pop-it{0%{scale:.72;} 55%{scale:1.16;} 100%{scale:1;}}
+.shake{animation:shake-it .5s ease both; transform-box:fill-box; transform-origin:center;}
+@keyframes shake-it{0%,100%{translate:0 0;} 20%{translate:-9px 0;} 40%{translate:9px 0;} 60%{translate:-6px 0;} 80%{translate:6px 0;}}
+.fade-out{animation:fade-out .5s ease forwards; pointer-events:none;}
+@keyframes fade-out{to{opacity:0; scale:.8;}}
+.jump-anim{animation:jump-anim .6s ease infinite; transform-box:fill-box; transform-origin:center bottom;}
+@keyframes jump-anim{0%,100%{translate:0 0; scale:1;} 45%{translate:0 -26px; scale:1.04;}}
+.float-anim{animation:float-anim 3s ease-in-out infinite;}
+@keyframes float-anim{0%,100%{translate:0 0;} 50%{translate:0 -12px;}}
+.cloud-anim{animation:cloud-anim 16s linear infinite;}
+@keyframes cloud-anim{from{translate:-40px 0;} to{translate:1120px 0;}}
+.text-shadow{ paint-order:stroke fill; stroke:#fff; stroke-width:8px; stroke-linejoin:round; }
+.pour-stream{stroke:var(--drink); stroke-width:16; stroke-linecap:round; fill:none;
+  stroke-dasharray:26 14; animation:flow .55s linear infinite;}
+@keyframes flow{to{stroke-dashoffset:-40;}};
+.sparkle-ring{fill:none; stroke:#FFFFFF; stroke-width:10; opacity:.9;
+  animation:ring-out .7s ease-out forwards;}
+@keyframes ring-out{from{r:8; opacity:.95;} to{r:110; opacity:0;}}
+
+/* ============================================================
+   8. 遮罩层：通关 / 安全提示 / 重置
+   ============================================================ */
+.overlay{
+  position:absolute; inset:0; z-index:30;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(74,55,40,.30);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  animation:fade-in .3s ease both;
+  padding:20px;
+}
+.card{
+  background:#fff; border-radius:var(--r-card); padding:34px 34px 30px;
+  text-align:center; max-width:min(92vw,560px);
+  box-shadow:0 18px 40px rgba(74,55,40,.25);
+  animation:pop-in .45s cubic-bezier(.3,1.6,.5,1) both;
+}
+@keyframes pop-in{from{transform:scale(.8); opacity:0;} to{transform:scale(1); opacity:1;}}
+.card-art{width:180px; height:180px;}
+.card h2{font-size:38px; font-weight:900; margin:6px 0 4px;}
+.card p{font-size:24px; font-weight:700; color:var(--ink2); line-height:1.5;}
+.card .row{display:flex; gap:14px; justify-content:center; margin-top:24px; flex-wrap:wrap;}
+.safety-line{
+  margin-top:16px; display:flex; align-items:center; justify-content:center; gap:12px;
+  background:#FFF3E0; border:4px solid #FFD79A; border-radius:var(--r-stage); padding:16px 18px;
+  font-size:24px; font-weight:900; color:#8A5223;
+}
+.hold-btn{position:relative; overflow:hidden;}
+.hold-btn .fill{
+  position:absolute; left:0; top:0; bottom:0; width:0%;
+  background:rgba(255,255,255,.55); pointer-events:none;
+}
+
+/* ============================================================
+   9. 减少动态效果
+   ============================================================ */
+@media (prefers-reduced-motion: reduce){
+  .float-anim,.cloud-anim,.breathe,.map-node.unlocked .node-disc,.finger,.jump-anim{animation:none !important;}
+  *{animation-duration:.01ms !important; transition-duration:.06s !important;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= 标题页 ================= -->
+  <section id="screen-title" class="screen">
+    <svg class="title-art" viewBox="0 0 300 300" aria-hidden="true">
+      <defs>
+        <radialGradient id="tGlow" cx="50%" cy="45%" r="55%">
+          <stop offset="0%" stop-color="#FFFFFF"/>
+          <stop offset="100%" stop-color="#FFF0C4"/>
+        </radialGradient>
+      </defs>
+      <circle cx="150" cy="150" r="140" fill="url(#tGlow)"/>
+      <g id="titleArt"></g>
+    </svg>
+    <div class="title-text">
+      <div class="title-main">小鸡的彩虹可乐日</div>
+      <div class="title-sub">拖一拖，点一点，帮小鸡找可乐</div>
+    </div>
+    <button class="btn big green title-start" id="btnStart">开始玩</button>
+  </section>
+
+  <!-- ================= 地图页 ================= -->
+  <section id="screen-map" class="screen" hidden>
+    <div class="map-head">
+      <div>
+        <div class="map-title">今天去哪儿？</div>
+        <div class="map-sub">点一个圆点，去那里玩</div>
+      </div>
+      <div class="hud-side">
+        <button class="icon-btn" id="btnMuteMap" aria-label="静音开关" aria-pressed="false"></button>
+      </div>
+    </div>
+    <div class="map-stage-wrap">
+      <svg id="mapStage" viewBox="0 0 1024 640" preserveAspectRatio="xMidYMid meet" role="img" aria-label="关卡地图：点亮的圆点可以进去玩"></svg>
+    </div>
+    <div class="map-foot">
+      <button class="link-btn" id="btnReset">从头开始玩</button>
+    </div>
+  </section>
+
+  <!-- ================= 游戏舞台 ================= -->
+  <section id="screen-play" class="screen" hidden>
+    <div id="hud">
+      <div class="hud-side">
+        <button class="icon-btn" id="btnBackMap" aria-label="回到地图">
+          <svg viewBox="0 0 40 40" fill="none" stroke="#4A3728" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M25 8 L11 20 L25 32"/>
+          </svg>
+        </button>
+        <div class="hud-chip"><span class="lv-no" id="hudNo">1</span><span id="hudTitle">开门找可乐</span></div>
+      </div>
+      <div class="hud-side">
+        <button class="icon-btn" id="btnMutePlay" aria-label="静音开关" aria-pressed="false"></button>
+      </div>
+    </div>
+    <div id="stage-wrap">
+      <svg id="stage" viewBox="0 0 1024 768" preserveAspectRatio="xMidYMid meet" role="img" aria-label="关卡舞台：拖一拖、点一点帮小鸡完成任务"></svg>
+    </div>
+    <div id="hud-bottom"></div>
+  </section>
+
+  <!-- ================= 通关显示 ================= -->
+  <div class="overlay" id="overlay-result" hidden>
+    <div class="card">
+      <div id="resultArt" class="card-art"></div>
+      <h2 id="resultTitle">太棒啦！</h2>
+      <p id="resultText">小鸡找到可乐了</p>
+      <div class="row">
+        <button class="btn green" id="btnBackToMap">回地图</button>
+        <button class="btn ghost" id="btnReplay">再玩一次</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 安全提示（第 6 关启用） ================= -->
+  <div class="overlay" id="overlay-safety" hidden>
+    <div class="card">
+      <h2>说个好玩的</h2>
+      <p>游戏里的炸弹是画出来的。<br>真的危险物，我们不碰，叫大人。</p>
+      <div class="row"><button class="btn green" id="btnSafetyOk">我知道啦</button></div>
+    </div>
+  </div>
+
+  <!-- ================= 重置确认 ================= -->
+  <div class="overlay" id="overlay-reset" hidden>
+    <div class="card">
+      <h2>要从头开始吗？</h2>
+      <p>已经玩的关卡会锁回去哦</p>
+      <div class="row">
+        <button class="btn hold-btn ghost" id="btnResetYes"><span class="fill"></span><span>按住：是</span></button>
+        <button class="btn green" id="btnResetNo">不要</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="live" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ============================================================
+   0. 基础工具
+   ============================================================ */
+const $  = (s, r) => (r || document).querySelector(s);
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const dist  = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+const lerp  = (a, b, t) => a + (b - a) * t;
+const rnd   = (a, b) => a + Math.random() * (b - a);
+
+const els = {
+  app:        $('#app'),
+  title:      $('#screen-title'),
+  titleArt:   $('#titleArt'),
+  map:        $('#screen-map'),
+  mapStage:   $('#mapStage'),
+  play:       $('#screen-play'),
+  stage:      $('#stage'),
+  hudNo:      $('#hudNo'),
+  hudTitle:   $('#hudTitle'),
+  result:     $('#overlay-result'),
+  resultArt:  $('#resultArt'),
+  resultTitle:$('#resultTitle'),
+  resultText: $('#resultText'),
+  safety:     $('#overlay-safety'),
+  doReset:    $('#overlay-reset'),
+  live:       $('#live'),
+  muteMap:    $('#btnMuteMap'),
+  mutePlay:   $('#btnMutePlay'),
+};
+
+const SPEAKER_ON  = '<svg viewBox="0 0 40 40"><path d="M6 15h6l7-6v22l-7-6H6z" fill="#4A3728"/><path d="M25 13c4 4 4 10 0 14M30 9c7 7 7 15 0 22" stroke="#4A3728" stroke-width="3.6" fill="none" stroke-linecap="round"/></svg>';
+const SPEAKER_OFF = '<svg viewBox="0 0 40 40"><path d="M6 15h6l7-6v22l-7-6H6z" fill="#B6A997"/><path d="M26 14l10 12M36 14L26 26" stroke="#B6A997" stroke-width="4" stroke-linecap="round"/></svg>';
+const STAR_PATH = 'M0,-10 L2.9,-4 L9.5,-3.1 L4.5,1.2 L5.9,8.1 L0,4.8 L-5.9,8.1 L-4.5,1.2 L-9.5,-3.1 L-2.9,-4 Z';
+
+/* SVG 构造函数 */
+function svgFrom(markup){
+  const wrap = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  wrap.innerHTML = markup;
+  return wrap;
+}
+function starSVG(size, color){
+  return `<svg viewBox="-12 -12 24 24" width="${size}" height="${size}"><path d="${STAR_PATH}" fill="${color||'#FFD35C'}" stroke="#E39A2A" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+}
+
+/* ============================================================
+   1. 小鸡（SVG path 手绘，圆润卡通风）
+   角色模型：大身体 / 小翅膀 / 低重心 / 眼睛偏下 / 圆嘴
+   ============================================================ */
+const CHICK_POSES = {
+  stand:    {eye:'open',    beak:'normal', wl:10,  wr:-10},
+  wonder:   {eye:'open',    beak:'normal', wl:22,  wr:-22, tilt:-7},
+  flap:     {eye:'closed',  beak:'smile',  wl:-52, wr:52},
+  run:      {eye:'open',    beak:'smile',  wl:-34, wr:34,  lean:7},
+  wait:     {eye:'open',    beak:'normal', wl:6,   wr:-6},
+  cheer:    {eye:'closed',  beak:'smile',  wl:-58, wr:58,  jump:-16},
+  happy:    {eye:'closed',  beak:'smile',  wl:-28, wr:28},
+  sip:      {eye:'closed',  beak:'sip',    wl:4,   wr:-4},
+  surprise: {eye:'wide',    beak:'open',   wl:-18, wr:18},
+};
+
+function chickEyes(kind){
+  if(kind === 'closed'){
+    return `<g stroke="#3E2A20" stroke-width="5" fill="none" stroke-linecap="round">
+      <path d="M-29,-84 q9,11 18,0"/><path d="M11,-84 q9,11 18,0"/></g>`;
+  }
+  const r = kind === 'wide' ? 13 : 11;
+  const pupil = (cx) => `<circle cx="${cx}" cy="-84" r="${r}" fill="#3E2A20"/>
+      <circle cx="${cx - r*0.34}" cy="${-84 - r*0.36}" r="${r*0.34}" fill="#fff"/>`;
+  return pupil(-20) + pupil(20);
+}
+function chickBeak(kind){
+  if(kind === 'smile')   return `<path d="M-15,-56 q15,16 30,0 q-15,10 -30,0z" fill="#FF9A3C" stroke="#EE7F1E" stroke-width="3.4" stroke-linejoin="round"/>`;
+  if(kind === 'open')    return `<path d="M-15,-56 q15,4 30,0 q0,20 -15,20 q-15,0 -15,-20z" fill="#F0803A" stroke="#EE7F1E" stroke-width="3.4" stroke-linejoin="round"/>`;
+  if(kind === 'sip')     return `<path d="M-9,-54 q9,10 18,0 q-9,7 -18,0z" fill="#FF9A3C" stroke="#EE7F1E" stroke-width="3.2" stroke-linejoin="round"/>`;
+  return `<path d="M-15,-57 L15,-57 L0,-41 Z" fill="#FF9A3C" stroke="#EE7F1E" stroke-width="3.4" stroke-linejoin="round"/>`;
+}
+function chickSVG(pose, opt){
+  opt = opt || {};
+  const p = CHICK_POSES[pose] || CHICK_POSES.stand;
+  const s = opt.scale == null ? 1 : opt.scale;
+  const jumpY = (p.jump || 0) + (opt.y || 0);
+  const body =
+    /* 阴影 */ `<ellipse cx="4" cy="8" rx="70" ry="13" fill="rgba(74,55,40,.13)"/>` +
+    /* 脚 */  `<path d="M-40,-2 C-43,12 -33,19 -24,16 C-16,13 -11,5 -11,-3 Z" fill="#FF9A3C"/>
+              <path d="M40,-2 C43,12 33,19 24,16 C16,13 11,5 11,-3 Z" fill="#FF9A3C"/>` +
+    /* 身体 */ `<path d="M0,-4 C-32,-4 -62,-30 -62,-72 C-62,-112 -30,-127 -16,-125
+                 C-24,-146 -4,-152 2,-131 C8,-152 28,-146 20,-125
+                 C34,-123 62,-110 62,-72 C62,-30 32,-4 0,-4 Z"
+                 fill="#FFD35C" stroke="#E39A2A" stroke-width="5" stroke-linejoin="round"/>` +
+    /* 肚皮 */ `<ellipse cx="2" cy="-42" rx="43" ry="35" fill="#FFEBB0"/>` +
+    /* 翅膀 左 */ `<g transform="rotate(${p.wl} -56 -80)">
+        <path d="M-54,-98 C-73,-92 -74,-62 -57,-55 C-45,-50 -45,-84 -54,-98 Z"
+              fill="#F8BF45" stroke="#E39A2A" stroke-width="4.4" stroke-linejoin="round"/></g>` +
+    /* 翅膀 右 */ `<g transform="rotate(${p.wr} 56 -80)">
+        <path d="M54,-98 C73,-92 74,-62 57,-55 C45,-50 45,-84 54,-98 Z"
+              fill="#F8BF45" stroke="#E39A2A" stroke-width="4.4" stroke-linejoin="round"/></g>` +
+    /* 腮红 */ `<circle cx="-40" cy="-62" r="11" fill="#FF9E9E" opacity=".45"/>
+               <circle cx="40" cy="-62" r="11" fill="#FF9E9E" opacity=".45"/>` +
+    chickEyes(p.eye) + chickBeak(p.beak);
+
+  const tf = `translate(${opt.x || 0} ${opt.y0 || 0}) scale(${opt.flip ? -s : s} ${s}) rotate(${p.tilt || 0} 0 -60) translate(0 ${jumpY})`;
+  const cls = 'chick' + (opt.cls ? ' ' + opt.cls : '');
+  const attrs = opt.id ? ` id="${opt.id}"` : '';
+  return `<g${attrs} class="${cls}" transform="${tf}">${body}</g>`;
+}
+
+/* ============================================================
+   2. 通用素材：可乐罐 / 玻璃罐 / 房屋 / 云 / 彩虹
+   ============================================================ */
+/* 未开封易拉罐：原点=罐底中心，宽约 44，高约 74 */
+function canSVG(opt){
+  opt = opt || {};
+  const open = !!opt.open;
+  const ring = open
+    ? `<g transform="rotate(-28 0 -66)"><ellipse cx="0" cy="-72" rx="12" ry="7" fill="#E6ECF1" stroke="#B9C2CB" stroke-width="3"/></g>`
+    : `<ellipse cx="0" cy="-66" rx="10" ry="5.4" fill="#E6ECF1" stroke="#B9C2CB" stroke-width="3"/>`;
+  return `
+  <g class="can-body">
+    <ellipse cx="0" cy="0" rx="22" ry="6" fill="#CB3A32"/>
+    <path d="M-22,-6 L-22,-62 C-22,-70 -14,-76 0,-76 C14,-76 22,-70 22,-62 L22,-6 Z" fill="#F0554B" stroke="#CB3A32" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M-22,-24 C-8,-14 8,-34 22,-24 L22,-40 C8,-50 -8,-30 -22,-40 Z" fill="#FFFFFF" opacity=".92"/>
+    <ellipse cx="0" cy="-66" rx="22" ry="7" fill="#E6ECF1" stroke="#B9C2CB" stroke-width="3"/>
+    ${ring}
+    <path d="M-15,-14 L-15,-58" stroke="#FFFFFF" stroke-width="4" opacity=".45" stroke-linecap="round"/>
+  </g>`;
+}
+function canEmptySVG(){
+  return `<g opacity=".55">
+    <ellipse cx="0" cy="0" rx="22" ry="6" fill="#B0A79E"/>
+    <path d="M-22,-6 L-22,-62 C-22,-70 -14,-76 0,-76 C14,-76 22,-70 22,-62 L22,-6 Z" fill="#D7CEC6" stroke="#B0A79E" stroke-width="4" stroke-linejoin="round"/>
+    <ellipse cx="0" cy="-66" rx="22" ry="7" fill="#E6ECF1" stroke="#B9C2CB" stroke-width="3"/>
+  </g>`;
+}
+/* 玻璃可乐罐：原点=罐底中心，宽 200 高 300 */
+function glassJarSVG(fillId){
+  return `
+  <ellipse cx="0" cy="6" rx="104" ry="16" fill="rgba(74,55,40,.13)"/>
+  <path id="jarBody" d="M-92,-296 C-92,-330 -44,-344 0,-344 C44,-344 92,-330 92,-296 L92,-16
+        C92,4 60,10 0,10 C-60,10 -92,4 -92,-16 Z"
+        fill="#E3F4FA" stroke="#9FD3E6" stroke-width="7" stroke-linejoin="round"/>
+  <clipPath id="${fillId}"><use href="#jarBody"/></clipPath>
+  <g clip-path="url(#${fillId})">
+    <rect id="jarFill" x="-100" y="10" width="200" height="0" fill="#8A5223"/>
+    <rect id="jarFillTop" x="-100" y="10" width="200" height="0" fill="#A2663370"/>
+  </g>
+  <path d="M-92,-296 C-92,-330 -44,-344 0,-344 C44,-344 92,-330 92,-296 L92,-16
+        C92,4 60,10 0,10 C-60,10 -92,4 -92,-16 Z"
+        fill="none" stroke="#9FD3E6" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M-64,-286 L-64,-40" stroke="#FFFFFF" stroke-width="15" opacity=".8" stroke-linecap="round"/>
+  <path d="M64,-286 L64,-40" stroke="#FFFFFF" stroke-width="8" opacity=".55" stroke-linecap="round"/>
+  <ellipse cx="0" cy="-344" rx="96" ry="20" fill="#F3FBFE" stroke="#9FD3E6" stroke-width="7"/>
+  <ellipse cx="0" cy="-344" rx="70" ry="13" fill="#D7F0F8"/>`;
+}
+function houseSVG(x, y, s, opt){
+  opt = opt || {};
+  const warm = opt.warm ? '#FFE9B8' : '#FFFFFF';
+  return `<g transform="translate(${x} ${y}) scale(${s})">
+    <ellipse cx="0" cy="8" rx="150" ry="16" fill="rgba(74,55,40,.12)"/>
+    <rect x="-120" y="-130" width="240" height="138" rx="22" fill="#FFF7E6" stroke="#E6CFA8" stroke-width="7"/>
+    <path d="M-146,-124 L0,-232 L146,-124 Z" fill="#C98A55" stroke="#A96C3C" stroke-width="7" stroke-linejoin="round"/>
+    <rect id="doorWin" x="-52" y="-124" width="104" height="130" rx="18" fill="${warm}" stroke="#E0BE85" stroke-width="7"/>
+    <circle cx="64" cy="-72" r="26" fill="#CFEEFF" stroke="#9FD3E6" stroke-width="6"/>
+  </g>`;
+}
+function cloudSVG(x, y, s, o){
+  return `<g class="decor" transform="translate(${x} ${y}) scale(${s})" opacity="${o||1}">
+    <ellipse cx="-38" cy="0" rx="44" ry="30" fill="#fff"/>
+    <ellipse cx="4" cy="-16" rx="52" ry="36" fill="#fff"/>
+    <ellipse cx="46" cy="2" rx="40" ry="28" fill="#fff"/>
+  </g>`;
+}
+function rainbowSVG(x, y, s){
+  const colors = ['#FF8A6B','#FFB35C','#FFDD5C','#8FD96A','#6BC6F0','#7C9CF5','#B98CE8'];
+  let out = `<g transform="translate(${x} ${y}) scale(${s})">`;
+  for(let i = 0; i < 7; i++){
+    const r = 210 - i * 22;
+    out += `<path d="M${-r},0 A${r},${r} 0 0 1 ${r},0" fill="none" stroke="${colors[i]}" stroke-width="22" stroke-linecap="round"/>`;
+  }
+  return out + '</g>';
+}
+function treeSVG(x, y, s){
+  return `<g class="decor" transform="translate(${x} ${y}) scale(${s})">
+    <rect x="-11" y="-46" width="22" height="58" rx="10" fill="#B07A46"/>
+    <circle cx="0" cy="-76" r="46" fill="#8ACF52"/>
+    <circle cx="-32" cy="-52" r="32" fill="#A8E06A"/>
+    <circle cx="32" cy="-54" r="34" fill="#96D95E"/>
+  </g>`;
+}
+function hintPill(x, y, text){
+  const w = text.length * 36 + 54;
+  return `<g class="hint-pill" transform="translate(${x} ${y})">
+    <rect x="${-w/2}" y="-38" width="${w}" height="76" rx="38"/>
+    <text y="13">${text}</text>
+    <path d="M-16,40 L16,40 L0,66 Z" fill="#fff" stroke="#EFE3CE" stroke-width="5" stroke-linejoin="round"/>
+  </g>`;
+}
+function fingerSVG(x, y){
+  return `<g class="finger" transform="translate(${x} ${y})">
+    <path d="M0,26 c0,-8 5,-14 13,-14 v-34 c0,-6 5,-11 11,-11 s11,5 11,11 v22 l6,-4 c4,-3 9,-1 10,4 l6,26
+             c3,13 -3,25 -15,30 l-18,7 c-7,3 -15,1 -20,-5 l-9,-11 c-3,-4 -2,-10 3,-12 z"
+          fill="#FFFFFF" stroke="#E6A23C" stroke-width="5" stroke-linejoin="round"/>
+  </g>`;
+}
+
+/* ============================================================
+   3. AudioEngine（WebAudio 合成，无音频文件）
+   ============================================================ */
+const AUDIO = (function(){
+  let ac = null, master = null, noiseBuf = null, muted = false, ready = false;
+
+  function unlock(){
+    try{
+      if(!ac){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return;
+        ac = new AC();
+        master = ac.createGain();
+        master.gain.value = muted ? 0 : 0.18;
+        const lim = ac.createDynamicsCompressor();
+        lim.threshold.value = -12; lim.knee.value = 8; lim.ratio.value = 8;
+        lim.attack.value = 0.003; lim.release.value = 0.2;
+        master.connect(lim); lim.connect(ac.destination);
+      }
+      if(ac.state !== 'running') ac.resume();
+      ready = true;
+    }catch(e){ ready = false; }
+  }
+  function tone(type, f0, f1, delay, dur, vol){
+    if(!ready || !ac) return;
+    const t = ac.currentTime + delay;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  function noise(filterType, f0, f1, delay, dur, vol){
+    if(!ready || !ac) return;
+    if(!noiseBuf){
+      noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for(let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t = ac.currentTime + delay;
+    const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noiseBuf; s.loop = true;
+    f.type = filterType;
+    f.frequency.setValueAtTime(f0, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(master);
+    s.start(t); s.stop(t + dur + 0.03);
+  }
+  const SOUNDS = {
+    pickup(){ tone('sine', 660, 880, 0, 0.12, 0.12); tone('sine', 990, 1320, 0.07, 0.15, 0.10); },
+    tap(){    tone('sine', 520, 700, 0, 0.09, 0.09); },
+    pour(){   tone('triangle', 145, 105, 0, 0.58, 0.05); noise('bandpass', 520, 220, 0, 0.58, 0.035);
+              tone('sine', 280, 370, 0.09, 0.09, 0.04); tone('sine', 240, 330, 0.26, 0.10, 0.04);
+              tone('sine', 310, 420, 0.43, 0.09, 0.035); },
+    slide(){  noise('bandpass', 700, 2200, 0, 0.40, 0.045); tone('triangle', 280, 660, 0, 0.36, 0.04); },
+    boom(){   noise('lowpass', 1300, 90, 0, 0.75, 0.085); tone('sine', 95, 38, 0, 0.72, 0.075); },
+    cheer(){  [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, f * 1.03, i * 0.10, 0.22, 0.07)); },
+    spark(){  tone('sine', 1200, 1800, 0, 0.10, 0.06); },
+  };
+  return {
+    unlock,
+    play(name){ if(muted) return; try{ (SOUNDS[name] || function(){})(); }catch(e){} },
+    setMuted(v){
+      muted = !!v;
+      if(ac && master) master.gain.setTargetAtTime(muted ? 0 : 0.18, ac.currentTime, 0.02);
+    },
+    isMuted(){ return muted; }
+  };
+})();
+
+/* ============================================================
+   4. 存档
+   ============================================================ */
+const SAVE_KEY = 'chick-rainbow-cola:save:v1';
+const Save = {
+  data: { schema: 1, highestUnlocked: 0, completed: [], lastLevel: null, muted: false, updatedAt: 0 },
+  load(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) return;
+      const o = JSON.parse(raw);
+      if(!o || o.schema !== 1) return;
+      this.data.highestUnlocked = Number.isInteger(o.highestUnlocked)
+        ? clamp(o.highestUnlocked, 0, 6) : 0;
+      this.data.completed = Array.isArray(o.completed) ? o.completed.slice(0, 7) : [];
+      this.data.lastLevel = typeof o.lastLevel === 'string' ? o.lastLevel : null;
+      this.data.muted = !!o.muted;
+      this.data.updatedAt = o.updatedAt || 0;
+    }catch(e){ /* 损坏存档：保持默认 */ }
+  },
+  write(){
+    this.data.updatedAt = Date.now();
+    try{ localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); }catch(e){}
+  },
+  reset(){
+    this.data = { schema: 1, highestUnlocked: 0, completed: [], lastLevel: null,
+                  muted: this.data.muted, updatedAt: 0 };
+    this.write();
+  }
+};
+
+/* ============================================================
+   5. 运行时状态
+   ============================================================ */
+const runtime = {
+  screen: 'TITLE',
+  levelIndex: null,
+  level: null,
+  levelState: null,
+  inputEnabled: true,
+  completionLocked: false,
+  pointerId: null,
+  pointerDown: false,
+  lastTouch: 0,
+  assist: false,
+  raf: 0,
+  lastT: 0,
+};
+
+function say(t){ els.live.textContent = t; }
+
+/* ============================================================
+   6. 关卡定义
+   ============================================================ */
+const LEVELS = [
+  { id:'01-find-cola', no:1, title:'开门找可乐', locked:false,
+    quote:'小鸡在做可乐，没有可乐，它去外面发现有可乐',
+    hintText:'找到没开封的可乐罐', resultText:'小鸡在外面发现有可乐啦' },
+  { id:'02-cart-home', no:2, title:'罐罐坐小车', locked:false,
+    quote:'在有很多可乐罐里面还没有喝，它就拿了然后拿回家',
+    hintText:'把 5 个罐子装上车，拉回家', resultText:'可乐罐全部到家啦' },
+  { id:'03-glass-pour', no:3, title:'咕噜玻璃罐', locked:false,
+    quote:'然后把它打开，再倒进可乐罐里，然后是玻璃做的',
+    hintText:'开罐、倒进玻璃罐，倒到星星线', resultText:'玻璃可乐罐装满啦' },
+  { id:'04-every-day', no:4, title:'每天咕咚', locked:false,
+    quote:'后来每天喝', hintText:'按住喝一口', resultText:'喝三天啦' },
+  { id:'05-slide-rainbow', no:5, title:'洗洗滑到彩虹', locked:false,
+    quote:'他去洗它，去外面滑去，看到彩虹', hintText:'擦干净，滑到彩虹上', resultText:'滑到彩虹啦' },
+  { id:'06-bomb-out', no:6, title:'炸弹搬到外面', locked:false,
+    quote:'发现彩虹上面有个炸——不对，是炸弹。他把炸弹拿下来，放在外面，我关上门等它爆了',
+    hintText:'把炸弹搬到屋外，关好门', resultText:'炸弹都搬到外面啦' },
+  { id:'07-boom-home', no:7, title:'轰隆回家玩', locked:false,
+    quote:'那些炸弹就炸飞了，然后他就在屋里喝可乐，玩。',
+    hintText:'炸弹炸飞了，回家喝可乐、玩', resultText:'平安回家，喝可乐玩啦' },
+];
+const PLAYABLE = 7; // 全 7 关
+
+/* ============================================================
+   7. 舞台渲染工具
+   ============================================================ */
+const Stage = {
+  root: els.stage,
+  hintLayer: null, fxLayer: null,
+  clear(){ this.root.innerHTML = ''; },
+  setScene(markup){
+    this.root.innerHTML = `<g id="scene">${markup}</g>
+      <g id="fxLayer"></g><g id="hintLayer"><g id="hintText"></g></g>`;
+    this.fxLayer  = $('#fxLayer', this.root);
+    this.hintLayer= $('#hintLayer', this.root);
+    this.textLayer= $('#hintText', this.root);
+  },
+  setHint(x, y, text){
+    if(!this.textLayer) return;
+    this.textLayer.innerHTML = text ? hintPill(x, y, text) : '';
+  },
+  showFinger(x, y){
+    if(!this.hintLayer) return;
+    this.hintLayer.innerHTML += fingerSVG(x, y);
+  },
+  clearFinger(){
+    if(!this.hintLayer) return;
+    const f = $('.finger', this.hintLayer);
+    if(f) f.remove();
+  },
+  stars(x, y, n, colors){
+    const pool = colors || ['#FFD35C','#FF9A3C','#8ED45C','#6BC6F0','#FF8A6B'];
+    for(let i = 0; i < n; i++){
+      const el = document.createElementNS('http://www.w3.org/2000/svg','path');
+      el.setAttribute('d', STAR_PATH);
+      el.setAttribute('class','star-fx run');
+      const a = rnd(-Math.PI, Math.PI), r = rnd(50, 130);
+      el.style.setProperty('--x', x + 'px');
+      el.style.setProperty('--y', y + 'px');
+      el.style.setProperty('--dx', (Math.cos(a) * r).toFixed(1) + 'px');
+      el.style.setProperty('--dy', (Math.sin(a) * r - 40).toFixed(1) + 'px');
+      el.style.setProperty('--rot', rnd(-180, 180).toFixed(0) + 'deg');
+      el.setAttribute('fill', pool[i % pool.length]);
+      el.setAttribute('stroke', '#FFFFFF');
+      el.setAttribute('stroke-width','2');
+      this.fxLayer.appendChild(el);
+      setTimeout(() => el.remove(), 800);
+    }
+  },
+  ring(x, y){
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 8);
+    c.setAttribute('class','sparkle-ring');
+    this.fxLayer.appendChild(c);
+    setTimeout(() => c.remove(), 750);
+  },
+  pop(node){ if(node){ node.classList.add('pop'); setTimeout(() => node.classList.remove('pop'), 460); } }
+};
+
+/* ============================================================
+   8. 第 1 关：开门找可乐
+   ============================================================ */
+const Level1 = {
+  key:'L1',
+  createState(){
+    return { step:'go-out', chickPos:{x:170,y:600}, dragging:false,
+             covers:{ bush:false, cloth:false, box:false }, found:false, arrived:false, done:false };
+  },
+  enter(ctx){
+    Stage.setScene(`
+      <defs>
+        <linearGradient id="sky1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#EAF7FF"/><stop offset="1" stop-color="#D7F0FF"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="1024" height="768" fill="url(#sky1)"/>
+      ${cloudSVG(150, 150, 1, .9)} ${cloudSVG(690, 110, .8, .85)}
+      <g class="decor">${treeSVG(880, 560, .8)}${treeSVG(980, 600, .65)}</g>
+
+      <!-- 屋外面 -->
+      <path d="M410,540 C600,516 800,528 1024,514 L1024,768 L410,768 Z" fill="#A8E06A"/>
+      <path d="M410,540 C600,516 800,528 1024,514 L1024,548 C800,560 600,552 410,574 Z" fill="#8ACF52"/>
+
+      <!-- 屋里 -->
+      <path d="M30,150 h380 v440 a40,40 0 0 1 -40,40 H70 a40,40 0 0 1 -40,-40 Z" fill="#FFF7E6"/>
+      <path d="M30,150 h380 v440 a40,40 0 0 1 -40,40 H70 a40,40 0 0 1 -40,-40 Z" fill="none" stroke="#E6CFA8" stroke-width="8"/>
+      <path d="M30,520 H410 V590 A40,40 0 0 1 370,630 H70 A40,40 0 0 1 30,590 Z" fill="#EFD6A8"/>
+      <!-- 制作台 -->
+      <rect x="66" y="424" width="200" height="26" rx="13" fill="#C98A55"/>
+      <rect x="86" y="450" width="26" height="72" rx="12" fill="#A96C3C"/>
+      <rect x="216" y="450" width="26" height="72" rx="12" fill="#A96C3C"/>
+      <path d="M116,424 h96 v-58 h-96 Z" fill="#DDE3E8" stroke="#B9C2CB" stroke-width="6" stroke-linejoin="round"/>
+      <text x="164" y="398" font-size="86" font-weight="900" fill="#8A7460" text-anchor="middle"
+            class="decor">?</text>
+
+      <!-- 门（跨内外） -->
+      <g id="doorG">
+        <rect x="366" y="286" width="92" height="290" rx="22" fill="#E0BE85" stroke="#C08F55" stroke-width="8"/>
+        <rect x="382" y="302" width="60" height="274" rx="16" fill="#F3DDB8"/>
+        <circle id="doorGlow" cx="412" cy="440" r="46" fill="#FFE9A8" opacity="0"/>
+      </g>
+
+      <!-- 隐藏的线索：脚印 -->
+      <g id="clueFoot" opacity="0">
+        <ellipse cx="590" cy="650" rx="15" ry="11" fill="#C98A55" opacity=".55" transform="rotate(-18 590 650)"/>
+        <ellipse cx="650" cy="626" rx="15" ry="11" fill="#C98A55" opacity=".55" transform="rotate(-18 650 626)"/>
+        <ellipse cx="712" cy="654" rx="15" ry="11" fill="#C98A55" opacity=".55" transform="rotate(-18 712 654)"/>
+        <ellipse cx="774" cy="628" rx="15" ry="11" fill="#C98A55" opacity=".55" transform="rotate(-18 774 628)"/>
+      </g>
+      <g id="clueBubble" opacity="0">
+        <circle cx="640" cy="450" r="16" fill="#fff" opacity=".85"/><circle cx="668" cy="418" r="10" fill="#fff" opacity=".8"/>
+        <circle cx="700" cy="392" r="13" fill="#fff" opacity=".7"/>
+      </g>
+
+      <!-- 出门后的小路（纯装饰，从门口通向盒子，不影响玩法） -->
+      <g class="decor" style="pointer-events:none">
+        <path d="M420,592 C540,628 600,600 700,600 C792,600 852,584 900,576"
+              fill="none" stroke="#DEC08A" stroke-width="60" stroke-linecap="round" opacity=".96"/>
+        <path d="M420,592 C540,628 600,600 700,600 C792,600 852,584 900,576"
+              fill="none" stroke="#EBD9AE" stroke-width="34" stroke-linecap="round" opacity=".9"/>
+        <ellipse cx="560" cy="616" rx="10" ry="6" fill="#C9A86E" opacity=".5"/>
+        <ellipse cx="760" cy="596" rx="9" ry="6" fill="#C9A86E" opacity=".5"/>
+        <ellipse cx="660" cy="602" rx="8" ry="5" fill="#C9A86E" opacity=".45"/>
+      </g>
+
+      <!-- 隐藏的可乐堆（在箱子下面） -->
+      <g id="colaPile" opacity="0" transform="translate(898 556)">
+        <g transform="translate(-40 0) scale(.8)">${canSVG()}</g>
+        <g transform="translate(0 -6) scale(.8)">${canSVG()}</g>
+        <g transform="translate(40 0) scale(.8)">${canSVG()}</g>
+        <g transform="translate(-20 -58) scale(.8)">${canSVG()}</g>
+        <g transform="translate(20 -58) scale(.8)">${canSVG()}</g>
+      </g>
+
+      <!-- 遮挡物 -->
+      <g id="coverBush" class="cover draggable" data-cover="bush" style="cursor:grab">
+        <circle cx="0" cy="0" r="72" fill="transparent"/>
+        <ellipse cx="14" cy="16" rx="70" ry="14" fill="rgba(74,55,40,.12)"/>
+        <circle cx="-36" cy="-14" r="42" fill="#8ACF52"/><circle cx="12" cy="-34" r="50" fill="#96D95E"/>
+        <circle cx="54" cy="-8" r="38" fill="#A8E06A"/>
+        <circle cx="-8" cy="-16" r="14" fill="#FF8A6B"/><circle cx="30" cy="-30" r="12" fill="#FFDD5C"/>
+      </g>
+      <g id="coverCloth" class="cover draggable" data-cover="cloth" style="cursor:grab">
+        <circle cx="0" cy="0" r="72" fill="transparent"/>
+        <ellipse cx="0" cy="14" rx="86" ry="16" fill="rgba(74,55,40,.12)"/>
+        <path d="M-82,10 L-52,-30 L52,-30 L82,10 Z" fill="#FFB3C7" stroke="#F58FA9" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M-52,-30 L-30,10 M-16,-30 L-16,10 M16,-30 L16,10 M52,-30 L30,10" stroke="#FFFFFF" stroke-width="6" opacity=".8"/>
+      </g>
+      <g id="coverBox" class="cover draggable" data-cover="box" style="cursor:grab">
+        <circle cx="0" cy="0" r="86" fill="transparent"/>
+        <ellipse cx="0" cy="16" rx="80" ry="15" fill="rgba(74,55,40,.12)"/>
+        <rect x="-74" y="-96" width="148" height="112" rx="18" fill="#D9A96F" stroke="#B98A4E" stroke-width="7"/>
+        <path d="M-74,-96 L-40,-124 L20,-124 L-74,-60 Z" fill="#C9955A" stroke="#B98A4E" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M-74,-96 L74,-96" stroke="#B98A4E" stroke-width="6"/>
+        <rect x="-8" y="-96" width="16" height="112" fill="#EBDCC4" opacity=".8"/>
+      </g>
+      ${(()=>{ // 遮挡物定位
+        return '';
+      })()}
+      <g id="chickSlot"></g>
+    `);
+    // 定位遮挡物
+    $('#coverBush').setAttribute('transform','translate(566 596)');
+    $('#coverCloth').setAttribute('transform','translate(742 612)');
+    $('#coverBox').setAttribute('transform','translate(900 570)');
+
+    const st = ctx.state;
+    $('#chickSlot').innerHTML = chickSVG('stand', { x:0, y0:0, scale:0.62, id:'chick' });
+    this.syncChick(ctx);
+
+    Stage.setHint(300, 700, '把小鸡拖到门口');
+  },
+  syncChick(ctx){
+    const c = $('#chick');
+    if(c) c.setAttribute('transform', `translate(${ctx.state.chickPos.x} ${ctx.state.chickPos.y}) scale(0.62)`);
+  },
+  handlePointer(type, pt, ev, ctx){
+    const st = ctx.state;
+    if(st.done) return;
+
+    if(st.step === 'go-out'){
+      const chickEl = $('#chick');
+      const target = type === 'down' ? (ev.target.closest('#chick') ? 'chick' : null) : st.grab;
+      if(type === 'down'){
+        st.grab = target;
+        if(target === 'chick'){
+          st.dragOff = { x: st.chickPos.x - pt.x, y: st.chickPos.y - pt.y };
+          Stage.clearFinger();
+        }
+      }else if(type === 'move' && st.grab === 'chick'){
+        st.chickPos.x = clamp(pt.x + st.dragOff.x, 70, 390);
+        st.chickPos.y = clamp(pt.y + st.dragOff.y, 430, 630);
+        this.syncChick(ctx);
+        if(dist(st.chickPos.x, st.chickPos.y, 412, 470) < (runtime.assist ? 150 : 110)){
+          this.goOut(ctx);
+        }
+      }else if(type === 'up' || type === 'cancel'){
+        st.grab = null;
+      }
+      return;
+    }
+
+    if(st.step === 'reveal'){
+      const coverEl = type === 'down' ? ev.target.closest('.cover') : null;
+      if(type === 'down'){
+        if(coverEl && !st.covers[coverEl.dataset.cover]){
+          st.grab = coverEl;
+          st.grabStart = { x: pt.x, y: pt.y };
+          st.grabBase  = this.parseTf(coverEl);
+          Stage.clearFinger();
+        }
+      }else if(type === 'move' && st.grab && st.grabStart && st.grabBase){
+        const b = st.grabBase;
+        st.grab.setAttribute('transform', `translate(${b.x + (pt.x - st.grabStart.x)} ${b.y + (pt.y - st.grabStart.y)})`);
+        if(dist(pt.x, pt.y, st.grabStart.x, st.grabStart.y) > 25) this.pushCover(ctx, st.grab);
+      }else if(type === 'up' || type === 'cancel'){
+        if(st.grab && st.grabStart && st.grabBase){
+          const moved = st.grabStart ? dist(pt.x, pt.y, st.grabStart.x, st.grabStart.y) : 0;
+          if(moved > 25) this.pushCover(ctx, st.grab);
+          else st.grab.setAttribute('transform', `translate(${st.grabBase.x} ${st.grabBase.y})`);
+          st.grab = null; st.grabStart = null;
+        }
+      }
+    }
+
+    if(st.step === 'to-box'){
+      const target = type === 'down' ? (ev.target.closest('#chick') ? 'chick' : null) : st.grab;
+      if(type === 'down'){
+        st.grab = target;
+        if(target === 'chick'){
+          st.dragOff = { x: st.chickPos.x - pt.x, y: st.chickPos.y - pt.y };
+          Stage.clearFinger();
+        }
+      }else if(type === 'move' && st.grab === 'chick'){
+        st.chickPos.x = clamp(pt.x + st.dragOff.x, 80, 940);
+        st.chickPos.y = clamp(pt.y + st.dragOff.y, 430, 700);
+        this.syncChick(ctx);
+        if(dist(st.chickPos.x, st.chickPos.y, 900, 648) < (runtime.assist ? 150 : 90)){
+          this.arriveBox(ctx);
+        }
+      }else if(type === 'up' || type === 'cancel'){
+        st.grab = null;
+      }
+      return;
+    }
+  },
+  parseTf(el){
+    const m = /translate\(([-\d.]+)[ ,]*([-\d.]+)\)/.exec(el.getAttribute('transform') || 'translate(0 0)');
+    return m ? { x: +m[1], y: +m[2] } : { x:0, y:0 };
+  },
+  goOut(ctx){
+    const st = ctx.state;
+    st.step = 'reveal';
+    st.grab = null; st.dragOff = null;   // 阶段切换时清掉上一阶段的拖拽状态
+    const c = $('#chick');
+    if(c){
+      c.style.transition = 'transform .7s cubic-bezier(.3,1.3,.5,1)';
+      st.chickPos = { x: 520, y: 648 };
+      c.setAttribute('transform','translate(520 648) scale(0.62)');
+      setTimeout(() => {
+        c.style.transition = '';
+        const slot = $('#chickSlot');
+        if(slot) slot.innerHTML = chickSVG('wait', { x:0, y0:0, scale:0.78, id:'chick' });
+        $('#chick').setAttribute('transform','translate(520 648) scale(0.78)');
+      }, 720);
+    }
+    const glow = $('#doorGlow');
+    if(glow) glow.animate([{opacity:0},{opacity:.9},{opacity:0}], {duration:700, easing:'ease-out'});
+    AUDIO.play('slide');
+    Stage.stars(412, 460, 6);
+    Stage.setHint(760, 400, '拨开挡住的东西');
+    say('小鸡出门啦');
+  },
+  pushCover(ctx, el){
+    const st = ctx.state;
+    const key = el.dataset.cover;
+    if(st.covers[key]) return;
+    st.covers[key] = true;
+    st.grab = null; st.grabStart = null;
+
+    const p = this.parseTf(el);
+    const dx = p.x < 700 ? -1 : 1;
+    el.style.transition = 'transform .45s ease, opacity .45s ease';
+    el.setAttribute('transform', `translate(${p.x + dx * 150} ${p.y - 60})`);
+    el.style.opacity = '.35';
+    el.classList.remove('draggable');
+    el.style.pointerEvents = 'none';
+    AUDIO.play('pickup');
+    Stage.stars(p.x, p.y - 40, 6);
+
+    const total = Object.values(st.covers).filter(Boolean).length;
+    if(key === 'box'){
+      this.foundCola(ctx);
+    }else{
+      const foot = $('#clueFoot'), bub = $('#clueBubble');
+      const target = total === 1 ? foot : bub;
+      if(target){ target.style.transition = 'opacity .5s ease'; target.style.opacity = '1'; }
+      const box = $('#coverBox');
+      if(!st.covers.box && box) box.classList.add('breathe');
+      Stage.setHint(total === 1 ? 700 : 860, 380, total === 1 ? '有脚印！' : '再找找看');
+    }
+  },
+  foundCola(ctx){
+    const st = ctx.state;
+    if(st.found) return;
+    st.found = true;
+    st.step = 'to-box';
+    const pile = $('#colaPile');
+    if(pile){
+      pile.style.transition = 'opacity .4s ease';
+      pile.style.opacity = '1';
+      setTimeout(() => pile.classList.add('pop'), 60);
+    }
+    Stage.setHint(900, 360, '把小鸡拖到盒子那里');
+    say('找到可乐啦');
+    AUDIO.play('cheer');
+    Stage.stars(898, 520, 12);
+    Stage.clearFinger();
+    Stage.showFinger(900, 648);
+  },
+  arriveBox(ctx){
+    const st = ctx.state;
+    if(st.arrived) return;
+    st.arrived = true;
+    st.grab = null;
+    const slot = $('#chickSlot');
+    if(slot){
+      slot.innerHTML = chickSVG('cheer', { x:0, y0:0, scale:0.78, id:'chick' });
+      $('#chick').setAttribute('transform', `translate(${st.chickPos.x} ${st.chickPos.y}) scale(0.78)`);
+    }
+    Stage.setHint(890, 340, '到盒子啦！');
+    say('放到盒子啦');
+    AUDIO.play('cheer');
+    Stage.stars(898, 520, 12);
+    Stage.clearFinger();
+    setTimeout(() => { if(!st.done) ctx.complete(); }, 1200);
+  },
+  update(dt, ctx){
+    const st = ctx.state;
+    if(st.step === 'reveal' && !st.found){
+      // 提示：12 秒无操作自动进入辅助（更大吸附范围已在物理判定里体现）
+    }
+  },
+  leave(){},
+};
+
+/* ============================================================
+   9. 第 2 关：罐罐坐小车
+   ============================================================ */
+const Level2 = {
+  key:'L2',
+  createState(){
+    const homes = [{x:150,y:640},{x:246,y:676},{x:330,y:618},{x:190,y:556},{x:280,y:520}];
+    return {
+      cans: homes.map((h, i) => ({ i, x:h.x, y:h.y, home:h, loaded:false, slot:-1 })),
+      slots: [{x:-80,y:-58},{x:-40,y:-58},{x:0,y:-58},{x:40,y:-58},{x:80,y:-58}],
+      cart:{ x:560, y:648 }, cartHome:{ x:560, y:648 }, progress:0,
+      dragKey:null, dragOff:null, pullStartX:0, arrived:false, done:false, pouring:false
+    };
+  },
+  enter(ctx){
+    const st = ctx.state;
+    Stage.setScene(`
+      <defs><linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#EAF7FF"/><stop offset="1" stop-color="#D7F0FF"/></linearGradient></defs>
+      <rect x="0" y="0" width="1024" height="768" fill="url(#sky2)"/>
+      ${cloudSVG(200, 130, 1, .9)} ${cloudSVG(640, 100, .7, .8)}
+      <path d="M0,506 C260,486 520,520 1024,500 L1024,768 L0,768 Z" fill="#A8E06A"/>
+      <path d="M0,506 C260,486 520,520 1024,500 L1024,536 C520,556 260,522 0,542 Z" fill="#8ACF52"/>
+      <g class="decor">${treeSVG(120, 560, .8)}${treeSVG(910, 520, .55)}</g>
+
+      <path id="road" d="M560,656 C660,672 760,660 848,608" fill="none" stroke="#EFD6A8" stroke-width="40" stroke-linecap="round"/>
+      <path d="M560,656 C660,672 760,660 848,608" fill="none" stroke="#E0BE85" stroke-width="6" stroke-linecap="round" stroke-dasharray="16 20" opacity=".7"/>
+
+      ${houseSVG(940, 520, 1.0, {})}
+
+      <!-- 虚线槽位（在车内侧下发） -->
+      <g id="cartGroup" transform="translate(560 648)">
+        <g id="cartBody">
+          <ellipse cx="0" cy="18" rx="118" ry="16" fill="rgba(74,55,40,.13)"/>
+          <path d="M-118,-90 L118,-90 L106,16 C104,20 96,22 82,22 L-82,22 C-96,22 -104,20 -106,16 Z"
+                fill="#FFB35C" stroke="#E08A2C" stroke-width="7" stroke-linejoin="round"/>
+          <rect x="-124" y="-102" width="248" height="20" rx="10" fill="#E9963A" stroke="#E08A2C" stroke-width="6"/>
+          <g id="slotMarks">
+            ${st.slots.map((s,i)=>`<rect x="${s.x-17}" y="${s.y-32}" width="34" height="66" rx="16" fill="#FFFFFF" opacity=".55"
+                 stroke="#E08A2C" stroke-width="4" stroke-dasharray="8 6"/>`).join('')}
+          </g>
+          <circle cx="-72" cy="30" r="26" fill="#5B4632" stroke="#3E2A20" stroke-width="6"/>
+          <circle cx="72" cy="30" r="26" fill="#5B4632" stroke="#3E2A20" stroke-width="6"/>
+          <circle cx="-72" cy="30" r="9" fill="#FFD35C"/>
+          <circle cx="72" cy="30" r="9" fill="#FFD35C"/>
+        </g>
+        <g id="handleGroup" opacity="0" style="cursor:grab">
+          <circle cx="150" cy="-60" r="70" fill="transparent"/>
+          <path d="M118,-70 L176,-70 L176,-40 L118,-40 Z" fill="#E08A2C"/>
+          <rect x="150" y="-120" width="26" height="60" rx="13" fill="#FF9A3C" stroke="#EE7F1E" stroke-width="5"/>
+          <circle cx="163" cy="-124" r="20" fill="#FFD35C" stroke="#E39A2A" stroke-width="5"/>
+        </g>
+      </g>
+
+      <g id="cansLayer"></g>
+      <g id="chickSlot"></g>
+      <g id="dots" transform="translate(560 520)">
+        ${st.slots.map((s,i)=>`<circle cx="${(i-2)*46}" cy="0" r="17" fill="#E0BE85" stroke="#C08F55" stroke-width="4"/>`).join('')}
+      </g>
+    `);
+    const layer = $('#cansLayer');
+    st.cans.forEach(c => {
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('class','can-item draggable');
+      g.setAttribute('data-can', c.i);
+      g.setAttribute('transform', `translate(${c.x} ${c.y})`);
+      g.innerHTML = canSVG() + `<circle class="hit" cx="0" cy="-40" r="52" fill="transparent"/>`;
+      layer.appendChild(g);
+    });
+    $('#chickSlot').innerHTML = chickSVG('wait', { x:0, y0:0, scale:0.72, id:'chick' });
+    $('#chick').setAttribute('transform','translate(430 660) scale(0.72)');
+    Stage.setHint(560, 300, '把罐子拖进小车');
+  },
+  cartAbs(ctx){
+    const st = ctx.state;
+    const path = $('#road');
+    const len = path.getTotalLength();
+    const p = path.getPointAtLength(st.progress * len);
+    return p;
+  },
+  slotTarget(ctx, i){
+    const st = ctx.state;
+    return { x: st.cart.x + st.slots[i].x, y: st.cart.y + st.slots[i].y };
+  },
+  handlePointer(type, pt, ev, ctx){
+    const st = ctx.state;
+    if(st.done) return;
+
+    // 满员后：拉车
+    const loaded = st.cans.filter(c => c.loaded).length;
+    if(loaded >= 5 && !st.arrived){
+      const hg = $('#handleGroup');
+      if(type === 'down'){
+        if(ev.target.closest('#handleGroup')){
+          st.dragKey = 'handle'; st.pullStartX = pt.x; Stage.clearFinger();
+        }
+      }else if(type === 'move' && st.dragKey === 'handle'){
+        const before = st.progress;
+        st.progress = clamp(st.progress + (pt.x - st.pullStartX) / 300, before, 1);
+        st.pullStartX = pt.x;
+        AUDIO.play('spark');
+      }else if(type === 'up' || type === 'cancel'){
+        st.dragKey = null;
+      }
+      return;
+    }
+
+    // 装车
+    const item = type === 'down' ? ev.target.closest('.can-item') : null;
+    if(type === 'down'){
+      if(item){
+        const c = st.cans[+item.dataset.can];
+        if(!c.loaded){
+          st.dragKey = 'can:' + c.i;
+          st.dragOff = { x: c.x - pt.x, y: c.y - pt.y };
+          Stage.clearFinger();
+        }
+      }
+    }else if(type === 'move' && st.dragKey && st.dragKey.indexOf('can:') === 0){
+      const i = +st.dragKey.slice(4), c = st.cans[i];
+      c.x = clamp(pt.x + st.dragOff.x, 60, 980);
+      c.y = clamp(pt.y + st.dragOff.y, 300, 730);
+    }else if(type === 'up' || type === 'cancel'){
+      if(st.dragKey && st.dragKey.indexOf('can:') === 0){
+        const i = +st.dragKey.slice(4), c = st.cans[i];
+        // 松手位置也算数：就算中间有几帧被浏览器合并丢掉，也不会差之千里
+        if(type === 'up' && st.dragOff){
+          c.x = clamp(pt.x + st.dragOff.x, 60, 980);
+          c.y = clamp(pt.y + st.dragOff.y, 300, 730);
+        }
+        // 找最近的空槽
+        let best = -1, bd = 1e9;
+        st.slots.forEach((s, si) => {
+          const used = st.cans.some(o => o.loaded && o.slot === si);
+          if(used) return;
+          const t = this.slotTarget(ctx, si);
+          const d = dist(c.x, c.y, t.x, t.y);
+          if(d < bd){ bd = d; best = si; }
+        });
+        // 吸附范围取目标可见尺寸的 1.5 倍以上，孩子手抖也能进
+        const R = runtime.assist ? 300 : 210;
+        if(best >= 0 && bd < R){
+          c.loaded = true; c.slot = best;
+          AUDIO.play('pickup');
+          Stage.pop($(`[data-can="${i}"] .can-body`));
+          this.refreshDots(ctx);
+          if(st.cans.filter(o=>o.loaded).length >= 5){
+            const hg = $('#handleGroup');
+            if(hg){ hg.style.transition='opacity .4s ease'; hg.style.opacity='1'; hg.classList.add('breathe'); }
+            Stage.setHint(720, 380, '拉回家');
+            say('装满啦，拉回家');
+          }
+        }
+        st.dragKey = null;
+      }
+    }
+  },
+  refreshDots(ctx){
+    const st = ctx.state;
+    const dots = $('#dots');
+    if(!dots) return;
+    dots.querySelectorAll('circle').forEach((d, i) => {
+      const full = st.cans.some(c => c.loaded && c.slot === i);
+      if(full && d.getAttribute('fill') !== '#FFD35C'){
+        d.setAttribute('fill','#FFD35C'); d.setAttribute('stroke','#E39A2A');
+        d.classList.add('pop');
+      }
+    });
+  },
+  update(dt, ctx){
+    const st = ctx.state;
+    const k = 1 - Math.pow(0.001, dt); // 平滑跟随
+    // 小车沿路
+    const p = this.cartAbs(ctx);
+    st.cart.x = p.x; st.cart.y = p.y;
+    const cart = $('#cartGroup');
+    if(cart) cart.setAttribute('transform', `translate(${st.cart.x.toFixed(1)} ${st.cart.y.toFixed(1)})`);
+    // 小鸡跟跑
+    const chick = $('#chick');
+    if(chick){
+      const cx = st.cart.x - 150, cy = st.cart.y + 8;
+      chick.setAttribute('transform', `translate(${cx.toFixed(1)} ${cy.toFixed(1)}) scale(0.72)`);
+    }
+    // 罐子吸附与跟随
+    st.cans.forEach(c => {
+      if(st.dragKey === 'can:' + c.i) return;
+      let tx, ty;
+      if(c.loaded){ const t = this.slotTarget(ctx, c.slot); tx = t.x; ty = t.y - 26; }
+      else { tx = c.home.x; ty = c.home.y; }
+      if(Math.abs(c.x - tx) > 0.5 || Math.abs(c.y - ty) > 0.5){
+        c.x = lerp(c.x, tx, k * 1.1); c.y = lerp(c.y, ty, k * 1.1);
+        const el = $(`[data-can="${c.i}"]`);
+        if(el) el.setAttribute('transform', `translate(${c.x.toFixed(1)} ${c.y.toFixed(1)})`);
+      }
+    });
+    // 到家
+    if(st.progress > 0.985 && !st.arrived && !st.done){
+      st.arrived = true;
+      Stage.setHint(940, 330, '到家啦！');
+      AUDIO.play('cheer');
+      Stage.stars(940, 420, 14);
+      const slot = $('#chickSlot');
+      if(slot){
+        slot.innerHTML = chickSVG('cheer', { x:0, y0:0, scale:0.8, id:'chick' });
+        $('#chick').setAttribute('transform', `translate(${st.cart.x - 150} ${st.cart.y + 8}) scale(0.8)`);
+      }
+      const win = $('#doorWin');
+      if(win) win.setAttribute('fill','#FFE9B8');
+      setTimeout(() => { if(!st.done) ctx.complete(); }, 1700);
+    }
+  },
+  leave(){}
+};
+
+/* ============================================================
+   10. 第 3 关：咕噜玻璃罐
+   ============================================================ */
+const Level3 = {
+  key:'L3',
+  createState(){
+    return {
+      cans: [
+        { x:186, y:648, opened:false, poured:0, done:false, phase:'idle' },
+        { x:300, y:648, opened:false, poured:0, done:false, phase:'idle' },
+        { x:414, y:648, opened:false, poured:0, done:false, phase:'idle' },
+      ],
+      active: 0, fill: 0, TARGET: 1, PER_CAN: 0.34,
+      dragKey: null, dragOff: null, downPt: null, pouring: false, pourSnd: 0, done:false
+    };
+  },
+  enter(ctx){
+    Stage.setScene(`
+      <defs>
+        <linearGradient id="roomG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FFF6E4"/><stop offset="1" stop-color="#FFEDCE"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="1024" height="768" fill="url(#roomG)"/>
+      <rect x="0" y="0" width="1024" height="500" fill="#FFF6E4"/>
+      <g class="decor">
+        <rect x="60" y="96" width="200" height="150" rx="20" fill="#CFEEFF" stroke="#9FD3E6" stroke-width="8"/>
+        <path d="M60,190 C120,150 200,210 260,180" stroke="#9FD3E6" stroke-width="8" fill="none"/>
+        ${cloudSVG(200, 172, .5, .9)}
+      </g>
+      <!-- 桌子 -->
+      <rect x="0" y="648" width="1024" height="46" rx="20" fill="#C98A55"/>
+      <rect x="0" y="694" width="1024" height="74" fill="#A96C3C"/>
+
+      <!-- 玻璃罐 -->
+      <g id="jarG" transform="translate(720 662)">
+        ${glassJarSVG('jarClip')}
+        <g id="starLine" transform="translate(0 -232)">
+          <path d="M-96,0 L96,0" stroke="#FFD35C" stroke-width="7" stroke-dasharray="14 10" stroke-linecap="round"/>
+          <g transform="translate(118 0)">${`<path d="${STAR_PATH}" fill="#FFD35C" stroke="#E39A2A" stroke-width="2"/>`}</g>
+        </g>
+        <g id="bubbles"></g>
+      </g>
+
+      <!-- 目标虚线圈 -->
+      <g id="pourTarget" opacity="0">
+        <circle cx="720" cy="330" r="70" fill="none" stroke="#FF9A3C" stroke-width="7" stroke-dasharray="16 12"/>
+      </g>
+
+      <g id="cans3"></g>
+      <g id="chickSlot"></g>
+      <g id="pourFx" opacity="0">
+        <path id="pourStream" d="M0,0 C10,30 60,60 78,96" class="pour-stream"/>
+      </g>
+      <defs>
+        <path id="tiltArrow" d="M0,0"/>
+      </defs>
+      <g id="tiltHint" opacity="0">
+        <path d="M540,470 C610,520 640,540 674,556" fill="none" stroke="#FF9A3C" stroke-width="9"
+              stroke-linecap="round" stroke-dasharray="18 14"/>
+        <path d="M652,536 L688,566 L646,574 Z" fill="#FF9A3C"/>
+      </g>
+    `);
+    const layer = $('#cans3');
+    ctx.state.cans.forEach((c, i) => {
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('class','can3 draggable');
+      g.setAttribute('data-can', i);
+      g.setAttribute('transform', `translate(${c.x} ${c.y})`);
+      g.innerHTML = canSVG() + `<rect class="hit" x="-52" y="-100" width="104" height="110" fill="transparent"/>`;
+      layer.appendChild(g);
+    });
+    this.renderCan(ctx, 0);
+    $('#chickSlot').innerHTML = chickSVG('wait', { x:0, y0:0, scale:0.74, id:'chick' });
+    $('#chick').setAttribute('transform','translate(560 648) scale(0.74)');
+    Stage.setHint(300, 470, '点一下，打开罐子');
+  },
+  renderCan(ctx, i){
+    const c = ctx.state.cans[i];
+    const g = $(`[data-can="${i}"]`);
+    if(!g) return;
+    const inner = g.querySelector('.can-body');
+    const hit = g.querySelector('.hit');
+    if(c.done){ g.innerHTML = canEmptySVG(); g.classList.remove('draggable'); return; }
+    if(inner) inner.remove();
+    if(hit) hit.remove();
+    g.insertAdjacentHTML('afterbegin', canSVG({ open: c.opened }) +
+      `<rect class="hit" x="-52" y="-100" width="104" height="110" fill="transparent"/>`);
+    g.style.opacity = (i === ctx.state.active || c.phase !== 'idle') ? '1' : '.62';
+    const rot = c.phase === 'pour' ? -58 : (c.phase === 'ready' ? 0 : 0);
+    g.setAttribute('transform', `translate(${c.x} ${c.y}) rotate(${rot} 0 -70)`);
+  },
+  setActive(ctx, i){
+    ctx.state.active = i;
+    ctx.state.cans.forEach((c, k) => {
+      const g = $(`[data-can="${k}"]`);
+      if(g && !c.done) g.style.opacity = (k === i) ? '1' : '.62';
+    });
+  },
+  updateJar(ctx){
+    const st = ctx.state;
+    const innerTop = -330, innerBot = 6, h = innerBot - innerTop;
+    const level = clamp(st.fill / st.TARGET, 0, 1);
+    const top = innerBot - h * 0.86 * level;
+    const f1 = $('#jarFill'), f2 = $('#jarFillTop');
+    if(f1){ f1.setAttribute('y', top); f1.setAttribute('height', innerBot - top); }
+    if(f2){ f2.setAttribute('y', top); f2.setAttribute('height', 16); }
+  },
+  spawnBubble(){
+    const b = $('#bubbles');
+    if(!b) return;
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    const x = rnd(-70, 70), r = rnd(5, 11);
+    c.setAttribute('cx', x); c.setAttribute('cy', -20); c.setAttribute('r', r);
+    c.setAttribute('fill', '#FFFFFF'); c.setAttribute('opacity', '.75');
+    b.appendChild(c);
+    const t0 = performance.now();
+    (function step(t){
+      const k = (t - t0) / 900;
+      if(k > 1){ c.remove(); return; }
+      const level = Number($('#jarFill') ? $('#jarFill').getAttribute('y') : 6);
+      c.setAttribute('cy', lerp(-20, level + 10, k));
+      requestAnimationFrame(step);
+    })(t0);
+  },
+  startPour(ctx){
+    const st = ctx.state;
+    if(st.pouring) return;
+    st.pouring = true;
+    AUDIO.play('pour');
+    st.pourSnd = 0;
+    $('#pourFx').setAttribute('opacity','1');
+    Stage.clearFinger();
+  },
+  stopPour(ctx){
+    const st = ctx.state;
+    if(!st.pouring) return;
+    st.pouring = false;
+    $('#pourFx').setAttribute('opacity','0');
+  },
+  handlePointer(type, pt, ev, ctx){
+    const st = ctx.state;
+    if(st.done) return;
+    const item = type === 'down' ? ev.target.closest('.can3') : null;
+
+    if(type === 'down'){
+      if(!item) return;
+      const i = +item.dataset.can, c = st.cans[i];
+      if(c.done) return;
+      st.downPt = { x: pt.x, y: pt.y, i };
+      st.dragKey = 'can:' + i;
+      st.dragOff = { x: c.x - pt.x, y: c.y - pt.y };
+      Stage.clearFinger();
+      return;
+    }
+    if(!st.dragKey || st.dragKey.indexOf('can:') !== 0) return;
+    const i = +st.dragKey.slice(4), c = st.cans[i];
+    if(type === 'cancel'){ st.dragKey = null; this.stopPour(ctx); return; }
+
+    if(type === 'move'){
+      const moved = dist(pt.x, pt.y, st.downPt.x, st.downPt.y);
+      if(!c.opened){
+        // 未开封：跟着拖动前先判定为「已开封」的一次轻触将在 up 处理
+        c.x = clamp(pt.x + st.dragOff.x, 90, 900);
+        c.y = clamp(pt.y + st.dragOff.y, 240, 640);
+        this.renderCan(ctx, i);
+      }else if(c.phase === 'opened'){
+        c.x = clamp(pt.x + st.dragOff.x, 90, 900);
+        c.y = clamp(pt.y + st.dragOff.y, 240, 640);
+        this.renderCan(ctx, i);
+        const R = runtime.assist ? 150 : 105;
+        if(dist(c.x, c.y - 40, 720, 340) < R){ this.readyCan(ctx, i); }
+      }else if(c.phase === 'ready'){
+        const v = dist(pt.x, pt.y, st.downPt.x, st.downPt.y);
+        if(v > 28){ this.startPour(ctx); c.phase = 'pour'; this.renderCan(ctx, i); }
+      }
+      return;
+    }
+    // up
+    let moved = 999;
+    if(st.downPt) moved = dist(pt.x, pt.y, st.downPt.x, st.downPt.y);
+    st.dragKey = null;
+    if(type === 'up' && c && st.dragOff && moved >= 16){
+      c.x = clamp(pt.x + st.dragOff.x, 90, 900);
+      c.y = clamp(pt.y + st.dragOff.y, 240, 640);
+      this.renderCan(ctx, i);
+    }
+    if(moved < 16){
+      // 当作点按
+      if(!c.opened){
+        this.openCan(ctx, i);
+      }else if(c.phase === 'opened'){
+        this.readyCan(ctx, i);           // 点一下直接飞到瓶子上方
+      }else if(c.phase === 'ready'){
+        c.phase = 'pour'; this.startPour(ctx); this.renderCan(ctx, i);
+      }else if(c.phase === 'pour'){
+        c.phase = 'ready'; this.stopPour(ctx); this.renderCan(ctx, i);
+      }
+    }else{
+      this.stopPour(ctx);
+      if(c.phase === 'pour'){ c.phase = 'ready'; this.renderCan(ctx, i); }
+      if(c.phase === 'opened'){
+        const R = runtime.assist ? 150 : 105;
+        if(dist(c.x, c.y - 40, 720, 340) < R) this.readyCan(ctx, i);
+      }
+    }
+  },
+  openCan(ctx, i){
+    const st = ctx.state, c = st.cans[i];
+    if(c.opened) return;
+    c.opened = true; c.phase = 'opened';
+    this.renderCan(ctx, i);
+    Stage.pop($(`[data-can="${i}"]`));
+    AUDIO.play('pickup');
+    Stage.ring(c.x, c.y - 70);
+    Stage.stars(c.x, c.y - 60, 5);
+    if(i !== st.active) this.setActive(ctx, i);
+    Stage.setHint(c.x + 120, 470, '拖到玻璃罐上');
+    $('#pourTarget').setAttribute('opacity','1');
+    say('开啦');
+  },
+  readyCan(ctx, i){
+    const st = ctx.state, c = st.cans[i];
+    if(c.phase === 'ready' || c.phase === 'pour') return;
+    c.phase = 'ready';
+    c.x = 660; c.y = 300;
+    this.renderCan(ctx, i);
+    AUDIO.play('tap');
+    $('#pourTarget').setAttribute('opacity','0');
+    $('#tiltHint').setAttribute('opacity','1');
+    Stage.setHint(600, 190, '往下倒');
+    say('倒进去');
+  },
+  update(dt, ctx){
+    const st = ctx.state;
+    if(st.pouring){
+      const c = st.cans[st.downPt ? st.downPt.i : st.active];
+      if(!c || c.done){ this.stopPour(ctx); return; }
+      const before = c.poured;
+      c.poured = clamp(c.poured + dt / 2.0, 0, 1);
+      st.fill = clamp(st.fill + (c.poured - before) * st.PER_CAN, 0, 1);
+      if(Math.random() < dt * 6) this.spawnBubble();
+      st.pourSnd += dt;
+      if(st.pourSnd > 0.62){ st.pourSnd = 0; AUDIO.play('pour'); }
+      // 流水位置跟随易拉罐
+      const fx = $('#pourFx');
+      if(fx) fx.setAttribute('transform', `translate(${c.x + 14} ${c.y - 74})`);
+      this.updateJar(ctx);
+      if(c.poured >= 1){ this.emptyCan(ctx, st.cans.indexOf(c)); }
+      if(st.fill >= st.TARGET - 0.001){ this.finish(ctx); }
+    }
+  },
+  emptyCan(ctx, i){
+    const st = ctx.state, c = st.cans[i];
+    if(c.done) return;
+    c.done = true; c.poured = 1;
+    this.stopPour(ctx);
+    st.pouring = false;
+    const g = $(`[data-can="${i}"]`);
+    if(g){
+      g.innerHTML = canEmptySVG();
+      g.classList.remove('draggable');
+      g.classList.add('pop');
+      AUDIO.play('tap');
+      Stage.stars(c.x, c.y - 50, 5);
+    }
+    const next = st.cans.findIndex(o => !o.done);
+    if(next >= 0){
+      this.setActive(ctx, next);
+      st.downPt = { i: next };
+      $('#tiltHint').setAttribute('opacity','0');
+      Stage.setHint(st.cans[next].x + 130, 460, '再开一罐');
+    }else{
+      st.fill = st.TARGET;
+      this.updateJar(ctx);
+      this.finish(ctx);
+    }
+  },
+  finish(ctx){
+    const st = ctx.state;
+    if(st.done) return;
+    st.done = true;
+    st.fill = st.TARGET;
+    this.updateJar(ctx);
+    this.stopPour(ctx);
+    Stage.setHint(720, 190, '装满啦！');
+    AUDIO.play('cheer');
+    Stage.stars(720, 400, 16);
+    for(let i = 0; i < 8; i++) setTimeout(() => this.spawnBubble(), i * 90);
+    const slot = $('#chickSlot');
+    if(slot){
+      slot.innerHTML = chickSVG('cheer', { x:0, y0:0, scale:0.8, id:'chick' });
+      $('#chick').setAttribute('transform','translate(560 648) scale(0.8)');
+    }
+    setTimeout(() => ctx.complete(), 1700);
+  },
+  leave(){}
+};
+
+/* ============================================================
+   10.5 第 4 关：每天咕咚
+   长按吸管喝（松手保留进度）+ 左推日夜卡，3 天盖星星印章
+   ============================================================ */
+const Level4 = {
+  key:'L4',
+  createState(){
+    return { days:[{done:false,fill:0},{done:false,fill:0},{done:false,fill:0}],
+             active:0, dragKey:null, dragOff:null, sipFrom:0, done:false };
+  },
+  enter(ctx){
+    Stage.setScene(`
+      <defs><linearGradient id="roomG2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#FFF6E4"/><stop offset="1" stop-color="#FFEDCE"/></linearGradient></defs>
+      <rect x="0" y="0" width="1024" height="768" fill="url(#roomG2)"/>
+      <rect x="0" y="0" width="1024" height="560" fill="#FFF6E4"/>
+      <rect x="60" y="80" width="240" height="170" rx="20" fill="#CFEEFF" stroke="#9FD3E6" stroke-width="8"/>
+      ${cloudSVG(160, 130, .5, .9)} ${cloudSVG(230, 110, .35, .8)}
+      <rect x="0" y="636" width="1024" height="48" rx="20" fill="#C98A55"/>
+      <rect x="0" y="684" width="1024" height="84" fill="#A96C3C"/>
+
+      <!-- 玻璃罐（已装满）+ 吸管 -->
+      <g id="jar4" transform="translate(330 670)">
+        ${glassJarSVG('jarClip4')}
+        <use href="#jarFill" y="-330"/>
+      </g>
+      <g id="straw" transform="translate(326 430)">
+        <rect x="-7" y="-4" width="14" height="240" rx="6" fill="#FFFFFF" stroke="#9FD3E6" stroke-width="5"/>
+        <rect x="-7" y="-4" width="14" height="50" rx="6" fill="#FF8A6B"/>
+      </g>
+
+      <!-- 小鸡 + 大轮廓提示按住罐子 -->
+      <g id="chickSlot"></g>
+      <circle id="sipHint" cx="520" cy="640" r="76" fill="none" stroke="#FF9A3C" stroke-width="7" stroke-dasharray="16 12" opacity="0"/>
+
+      <!-- 三个日夜卡 -->
+      <g id="daysRow" transform="translate(560 540)">
+        <g class="day" id="day0" transform="translate(0 0)">
+          <rect x="-100" y="-50" width="200" height="180" rx="22" fill="#FFFFFF" stroke="#E6CFA8" stroke-width="7"/>
+          <g transform="translate(0 -70)">
+            <circle cx="-32" cy="0" r="22" fill="#FFDD5C"/>
+            <g stroke="#FFDD5C" stroke-width="6" stroke-linecap="round">
+              <line x1="-32" y1="-36" x2="-32" y2="-46"/>
+              <line x1="-32" y1="36" x2="-32" y2="46"/>
+              <line x1="-68" y1="0" x2="-78" y2="0"/>
+              <line x1="4" y1="0" x2="14" y2="0"/>
+              <line x1="-56" y1="-24" x2="-66" y2="-34"/>
+              <line x1="-8" y1="24" x2="-2" y2="34"/>
+              <line x1="-56" y1="24" x2="-66" y2="34"/>
+              <line x1="-8" y1="-24" x2="-2" y2="-34"/>
+            </g>
+          </g>
+          <text x="0" y="50" font-size="28" font-weight="900" fill="#8A7460" text-anchor="middle" paint-order="stroke fill" stroke="#fff" stroke-width="6">第一天</text>
+          <g class="stamp" transform="translate(60 60)" opacity="0">
+            <circle r="30" fill="#FFD35C" stroke="#E39A2A" stroke-width="5"/>
+            <path d="${STAR_PATH}" fill="#fff" stroke="#E39A2A" stroke-width="2.4"/>
+          </g>
+        </g>
+        <g class="day" id="day1" transform="translate(260 0)">
+          <rect x="-100" y="-50" width="200" height="180" rx="22" fill="#FFFFFF" stroke="#E6CFA8" stroke-width="7"/>
+          <g transform="translate(0 -70)">
+            <circle cx="-32" cy="0" r="22" fill="#FFFFFF" stroke="#9FD3E6" stroke-width="4"/>
+            <g fill="#DDE7EE">
+              <ellipse cx="-58" cy="0" rx="16" ry="9"/>
+              <ellipse cx="-10" cy="14" rx="22" ry="11"/>
+              <ellipse cx="-44" cy="20" rx="20" ry="10"/>
+            </g>
+          </g>
+          <text x="0" y="50" font-size="28" font-weight="900" fill="#8A7460" text-anchor="middle" paint-order="stroke fill" stroke="#fff" stroke-width="6">第二天</text>
+          <g class="stamp" transform="translate(60 60)" opacity="0">
+            <circle r="30" fill="#FFD35C" stroke="#E39A2A" stroke-width="5"/>
+            <path d="${STAR_PATH}" fill="#fff" stroke="#E39A2A" stroke-width="2.4"/>
+          </g>
+        </g>
+        <g class="day" id="day2" transform="translate(520 0)">
+          <rect x="-100" y="-50" width="200" height="180" rx="22" fill="#FFFFFF" stroke="#E6CFA8" stroke-width="7"/>
+          <g transform="translate(0 -70)">
+            <circle cx="-32" cy="0" r="22" fill="#FFDD5C"/>
+            <g fill="#8ACF52" stroke="#5FA637" stroke-width="3" stroke-linejoin="round">
+              <path d="M-86,-30 q8,-18 24,-12 q12,4 18,-6"/>
+            </g>
+            <g fill="#FF9A3C">
+              <path d="M-86,-28 q4,-3 8,-3 v6 z M-78,-32 q4,-3 8,-3 v6 z"/>
+              <circle cx="-70" cy="-26" r="1.6"/>
+            </g>
+          </g>
+          <text x="0" y="50" font-size="28" font-weight="900" fill="#8A7460" text-anchor="middle" paint-order="stroke fill" stroke="#fff" stroke-width="6">第三天</text>
+          <g class="stamp" transform="translate(60 60)" opacity="0">
+            <circle r="30" fill="#FFD35C" stroke="#E39A2A" stroke-width="5"/>
+            <path d="${STAR_PATH}" fill="#fff" stroke="#E39A2A" stroke-width="2.4"/>
+          </g>
+        </g>
+      </g>
+
+      <!-- 长按进度环 + 按住提示 -->
+      <g id="ringG" transform="translate(520 640)">
+        <circle r="68" fill="none" stroke="#FFFFFF" stroke-width="10"/>
+        <circle id="ringFill" r="68" fill="none" stroke="#8ED45C" stroke-width="10" stroke-linecap="round"
+                stroke-dasharray="427" stroke-dashoffset="427" pathLength="427" transform="rotate(-90)"/>
+      </g>
+
+      <g id="bubbles4"></g>
+    `);
+    $('#chickSlot').innerHTML = chickSVG('wait', { x:0, y0:0, scale:0.74, id:'chick' });
+    $('#chick').setAttribute('transform','translate(440 650) scale(0.74)');
+    this.renderJar(ctx);
+    Stage.setHint(520, 380, '按住可乐罐');
+  },
+  renderJar(ctx){
+    const st = ctx.state;
+    const f1 = $('#jarFill'), f2 = $('#jarFillTop');
+    if(!f1) return;
+    // 满罐（剧情延续自第 3 关）
+    f1.setAttribute('y','-258'); f1.setAttribute('height','270');
+    if(f2){ f2.setAttribute('y','-258'); f2.setAttribute('height','16'); }
+  },
+  spawnBubble(){
+    const b = $('#bubbles4');
+    if(!b) return;
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    const x = rnd(-10, 10), r = rnd(5, 11);
+    c.setAttribute('cx', x); c.setAttribute('cy', 0); c.setAttribute('r', r);
+    c.setAttribute('fill', '#FFFFFF'); c.setAttribute('opacity', '.75');
+    b.appendChild(c);
+    const t0 = performance.now();
+    (function step(t){
+      const k = (t - t0) / 800;
+      if(k > 1){ c.remove(); return; }
+      c.setAttribute('cy', lerp(0, -240, k));
+      c.setAttribute('opacity', String(0.75 * (1 - k * 0.6)));
+      requestAnimationFrame(step);
+    })(t0);
+  },
+  updateRing(st){
+    const r = $('#ringFill');
+    if(!r) return;
+    const p = clamp(st.days[st.active].fill, 0, 1);
+    const dash = 427 * (1 - p);
+    r.setAttribute('stroke-dashoffset', String(dash));
+  },
+  handlePointer(type, pt, ev, ctx){
+    const st = ctx.state;
+    if(st.done) return;
+    // 接受按下：仅当点在玻璃罐附近（罐子在 (330 670)）或当前正在喝（吸管从 326 起）
+    const jarX = 330, jarY = 670;
+    const nearJar = type === 'down' ? (ev.target.closest('#jar4') || ev.target.closest('#straw')
+      || dist(pt.x, pt.y, jarX, jarY) < (runtime.assist ? 260 : 200)) : false;
+
+    if(type === 'down'){
+      if(nearJar){
+        st.dragKey = 'sip';
+        st.dragOff = { x: jarX - pt.x, y: jarY - pt.y };
+        AUDIO.play('tap');
+        Stage.clearFinger();
+        // 不依赖持续 pointermove：自己起 tick
+        if(!st._sipTick){
+          let lastT = performance.now();
+          st._sipTick = setInterval(() => {
+            const now = performance.now();
+            // 页面切到后台时只推进时间戳不推进逻辑：省电，也避免回来瞬间跳一大段
+            if(document.hidden){ lastT = now; return; }
+            const dt = Math.min((now - lastT) / 1000, 0.05);
+            lastT = now;
+            if(st.dragKey !== 'sip') return;
+            st.days[st.active].fill = clamp(st.days[st.active].fill + dt * 0.7, 0, 1);
+            this.updateRing(st);
+            if(Math.random() < dt * 5) this.spawnBubble();
+            st.sipFrom = (st.sipFrom || 0) + dt;
+            if(st.sipFrom > 0.5){ st.sipFrom = 0; AUDIO.play('pour'); }
+            if(st.days[st.active].fill >= 1) this.stamp(ctx);
+          }, 33);
+        }
+      }
+      return;
+    }
+    if(!st.dragKey) return;
+    if(type === 'cancel'){ st.dragKey = null; return; }
+
+    if(type === 'move'){
+      // 持续按住（move 期间也允许额外加分）
+      return;
+    }
+    // up
+    if(st.dragKey === 'sip'){
+      st.dragKey = null;
+      if(st._sipTick){ clearInterval(st._sipTick); st._sipTick = null; }
+    }
+  },
+  leave(ctx){
+      const st = ctx.state;
+      if(st._sipTick){ clearInterval(st._sipTick); st._sipTick = null; }
+  },
+  stamp(ctx){
+    const st = ctx.state;
+    if(st.days[st.active].done) return;
+    st.days[st.active].done = true;
+    const d = $('#day' + st.active);
+    if(d){
+      const stamp = d.querySelector('.stamp');
+      if(stamp){ stamp.setAttribute('opacity','1'); stamp.classList.add('pop'); }
+      AUDIO.play('pickup');
+      Stage.stars(parseFloat(d.getAttribute('transform').split('(')[1]) + 620, 540, 6);
+    }
+    const next = st.days.findIndex(d => !d.done);
+    if(next >= 0){
+      st.active = next;
+      st.days[next].fill = 0;
+      this.updateRing(st);
+      Stage.setHint(520, 380, '按住可乐罐');
+    }else{
+      this.finish(ctx);
+    }
+  },
+  finish(ctx){
+    const st = ctx.state;
+    if(st.done) return;
+    st.done = true;
+    AUDIO.play('cheer');
+    Stage.setHint(720, 420, '喝三天啦！');
+    Stage.stars(512, 540, 14);
+    const slot = $('#chickSlot');
+    if(slot){
+      slot.innerHTML = chickSVG('cheer', { x:0, y0:0, scale:0.78, id:'chick' });
+      $('#chick').setAttribute('transform','translate(440 650) scale(0.78)');
+    }
+    setTimeout(() => ctx.complete(), 1700);
+  },
+  leave(){}
+};
+
+/* ============================================================
+   10.6 第 5 关：洗洗滑到彩虹
+   擦污点 → 沿 S 形坡道推着滑 → 放大镜找彩虹上的炸弹
+   ============================================================ */
+const Level5 = {
+  key:'L5',
+  createState(){
+    return { phase:'wash',                     // wash → slide → find → done
+             washes:[false,false,false,false,false,false],
+             washTotal:6, slideProgress:0, found:false,
+             dragKey:null, dragOff:null, downPt:null, downMove:0, done:false };
+  },
+  enter(ctx){
+    const st = ctx.state;
+    Stage.setScene(`
+      <defs><linearGradient id="sky5" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#EAF7FF"/><stop offset="1" stop-color="#D7F0FF"/></linearGradient>
+        <clipPath id="magnifierClip"><circle cx="0" cy="0" r="86"/></clipPath>
+      </defs>
+      <rect x="0" y="0" width="1024" height="768" fill="url(#sky5)"/>
+      <g class="decor">
+        ${cloudSVG(180, 130, 1, .9)} ${cloudSVG(700, 100, .8, .85)}
+        <rect x="60" y="92" width="200" height="120" rx="20" fill="#CFEEFF" stroke="#9FD3E6" stroke-width="8"/>
+        <path d="M260,170 C320,140 360,200 420,160" stroke="#9FD3E6" stroke-width="6" fill="none"/>
+      </g>
+
+      <!-- 屋内桌 -->
+      <rect x="0" y="540" width="1024" height="100" rx="20" fill="#C98A55"/>
+      <rect x="0" y="640" width="1024" height="128" fill="#A96C3C"/>
+
+      <!-- 玻璃罐（带污点） -->
+      <g id="jar5" transform="translate(280 510)">
+        ${glassJarSVG('jarClip5')}
+        <g id="spots">
+          <ellipse class="spot" cx="-30" cy="-200" rx="22" ry="14" fill="#A39A8E" opacity=".65"/>
+          <ellipse class="spot" cx="40" cy="-160" rx="20" ry="13" fill="#9F9384" opacity=".65"/>
+          <ellipse class="spot" cx="-20" cy="-120" rx="24" ry="16" fill="#A39A8E" opacity=".65"/>
+          <ellipse class="spot" cx="30" cy="-80" rx="18" ry="12" fill="#9F9384" opacity=".65"/>
+          <ellipse class="spot" cx="-40" cy="-40" rx="20" ry="13" fill="#A39A8E" opacity=".65"/>
+          <ellipse class="spot" cx="20" cy="-10" rx="22" ry="14" fill="#9F9384" opacity=".65"/>
+        </g>
+        <g id="bubbles5"></g>
+      </g>
+
+      <!-- 滑行坡道（仅洗完后显示） -->
+      <g id="trackG" opacity="0">
+        <path id="track" d="M380,640 C500,580 700,720 920,500" fill="none" stroke="#FFFFFF" stroke-width="160" stroke-linecap="round"/>
+        <path d="M380,640 C500,580 700,720 920,500" fill="none" stroke="#E0BE85" stroke-width="12" stroke-linecap="round" stroke-dasharray="22 26" opacity=".7"/>
+        <path id="trackRail" d="M380,640 C500,580 700,720 920,500" fill="none" stroke="transparent" stroke-width="120" stroke-linecap="round"/>
+      </g>
+
+      <!-- 放大镜 -->
+      <g id="magG" opacity="0">
+        <circle class="mag-helper" cx="0" cy="0" r="120" fill="transparent"/>
+        <circle cx="0" cy="0" r="86" fill="#FFFFFF" fill-opacity=".65" stroke="#5B4632" stroke-width="8"/>
+        <circle cx="0" cy="0" r="86" fill="none" stroke="#9FD3E6" stroke-width="3" stroke-dasharray="6 6"/>
+        <rect x="58" y="58" width="44" height="14" rx="7" fill="#5B4632" transform="rotate(45 58 58)"/>
+      </g>
+
+      <!-- 彩虹 + 隐藏的炸弹（洗完后显示） -->
+      <g id="rainbow5" opacity="0">
+        ${rainbowSVG(720, 540, .65)}
+        <g id="bombOnRainbow" opacity="0">
+          <circle cx="720" cy="316" r="28" fill="#3E2A20"/>
+          <circle cx="710" cy="306" r="9" fill="#FFFFFF" opacity=".55"/>
+          <rect x="717" y="282" width="6" height="14" rx="3" fill="#A96C3C"/>
+          <circle cx="720" cy="278" r="6" fill="#FFDD5C"/>
+          <circle cx="724" cy="276" r="3" fill="#FF9A3C"/>
+        </g>
+      </g>
+
+      <!-- 海绵（拖拽元素） -->
+      <g id="sponge" class="draggable" style="cursor:grab" opacity="0">
+        <ellipse cx="0" cy="0" rx="86" ry="56" fill="#FFDD5C" stroke="#E39A2A" stroke-width="6"/>
+        <g fill="#FFFFFF" opacity=".55">
+          <circle cx="-32" cy="-12" r="10"/><circle cx="20" cy="20" r="13"/><circle cx="-12" cy="22" r="8"/><circle cx="34" cy="-18" r="9"/>
+        </g>
+        <text x="0" y="6" font-size="22" font-weight="900" fill="#E39A2A" text-anchor="middle">擦</text>
+      </g>
+
+      <!-- 小鸡 -->
+      <g id="chickSlot"></g>
+
+      <!-- 对话气泡 -->
+      <g id="say5" opacity="0">
+        <rect x="80" y="60" width="280" height="90" rx="24" fill="#FFFFFF" stroke="#E6CFA8" stroke-width="6"/>
+        <text id="say5text" x="220" y="116" font-size="34" font-weight="900" fill="#4A3728" text-anchor="middle">炸——</text>
+      </g>
+    `);
+    $('#chickSlot').innerHTML = chickSVG('wait', { x:0, y0:0, scale:0.74, id:'chick' });
+    $('#chick').setAttribute('transform','translate(110 528) scale(0.74)');
+    $('#sponge').setAttribute('transform','translate(180 420)');
+    $('#sponge').setAttribute('opacity','1');
+    Stage.setHint(180, 320, '擦掉罐子上的脏东西');
+  },
+  spawnBubble(){
+    const b = $('#bubbles5');
+    if(!b) return;
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    const x = rnd(-90, 90), y = rnd(-330, -10), r = rnd(4, 10);
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', r);
+    c.setAttribute('fill', '#FFFFFF'); c.setAttribute('opacity', '.75');
+    b.appendChild(c);
+    const t0 = performance.now();
+    (function step(t){
+      const k = (t - t0) / 700;
+      if(k > 1){ c.remove(); return; }
+      c.setAttribute('cy', lerp(y, y - 60, k));
+      c.setAttribute('opacity', String(0.75 * (1 - k)));
+      requestAnimationFrame(step);
+    })(t0);
+  },
+  setWashPoint(ctx, pt){
+    const st = ctx.state;
+    const spots = document.querySelectorAll('#spots .spot');
+    spots.forEach((sp, i) => {
+      if(st.washes[i]) return;
+      const b = sp.getBoundingClientRect();
+      const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+      if(dist(pt.x, pt.y, cx, cy) < (runtime.assist ? 120 : 80)){
+        sp.style.transition = 'opacity .25s ease, scale .25s ease';
+        sp.style.opacity = '0';
+        sp.style.scale = '1.6';
+        st.washes[i] = true;
+        AUDIO.play('tap');
+        Stage.stars(280 + parseFloat(sp.getAttribute('cx')), 510 + parseFloat(sp.getAttribute('cy')), 4);
+        this.spawnBubble();
+      }
+    });
+    if(st.washes.every(Boolean)) this.toSlide(ctx);
+  },
+  toSlide(ctx){
+    const st = ctx.state;
+    st.phase = 'slide';
+    Stage.setHint(720, 320, '按住小鸡往前滑');
+    say('擦干净啦');
+    AUDIO.play('pickup');
+    const track = $('#trackG');
+    if(track) track.setAttribute('opacity','1');
+    const sp = $('#sponge'); if(sp) sp.style.opacity = '0';
+    const chick = $('#chick');
+    if(chick){
+      chick.style.transition = 'transform .8s cubic-bezier(.3,1.2,.5,1)';
+      chick.setAttribute('transform','translate(110 608) scale(0.74)');
+      setTimeout(() => { chick.style.transition = ''; }, 820);
+    }
+  },
+  toFind(ctx){
+    const st = ctx.state;
+    st.phase = 'find';
+    const rain = $('#rainbow5');
+    if(rain) rain.setAttribute('opacity','1');
+    const mag = $('#magG');
+    if(mag){ mag.setAttribute('opacity','1'); mag.setAttribute('transform','translate(720 316)'); }
+    Stage.setHint(720, 200, '用放大镜找一找');
+    say('彩虹上面有个炸弹！');
+    const chick = $('#chick');
+    if(chick) chick.classList.add('jump-anim');
+  },
+  checkMagnifier(ctx, pt){
+    const st = ctx.state;
+    if(st.found) return;
+    const b = $('#bombOnRainbow').getBoundingClientRect();
+    const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+    if(dist(pt.x, pt.y, cx, cy) < (runtime.assist ? 100 : 60)){
+      st.found = true;
+      const bomb = $('#bombOnRainbow');
+      if(bomb){ bomb.setAttribute('opacity','1'); bomb.classList.add('pop'); }
+      AUDIO.play('spark');
+      Stage.stars(720, 316, 6);
+      // 原话两拍气泡
+      const sg = $('#say5');
+      if(sg){ sg.setAttribute('opacity','1'); $('#say5text').textContent = '炸——'; }
+      setTimeout(() => { $('#say5text').textContent = '不对，是炸弹！'; AUDIO.play('boom'); Stage.stars(720, 316, 10); }, 900);
+      const chick = $('#chick');
+      if(chick) chick.classList.remove('jump-anim');
+      Stage.setHint(720, 200, '找到啦！');
+      setTimeout(() => ctx.complete(), 2000);
+    }
+  },
+  handlePointer(type, pt, ev, ctx){
+    const st = ctx.state;
+    if(st.done) return;
+
+    if(st.phase === 'wash'){
+      const onSponge = ev.target.closest('#sponge');
+      if(type === 'down' && onSponge){
+        st.dragKey = 'sponge';
+        st.dragOff = { x: pt.x - 180, y: pt.y - 420 };
+        st.downPt = { x: pt.x, y: pt.y }; st.downMove = 0;
+        Stage.clearFinger();
+        return;
+      }
+      if(type === 'move' && st.dragKey === 'sponge'){
+        const sx = pt.x - st.dragOff.x, sy = pt.y - st.dragOff.y;
+        $('#sponge').setAttribute('transform', `translate(${sx} ${sy})`);
+        st.downMove = Math.max(st.downMove, dist(pt.x, pt.y, st.downPt.x, st.downPt.y));
+        this.setWashPoint(ctx, { x: sx, y: sy });
+        return;
+      }
+      if(type === 'up' || type === 'cancel'){
+        if(st.dragKey === 'sponge' && st.downMove > 30){
+          const sx = pt.x - st.dragOff.x, sy = pt.y - st.dragOff.y;
+          this.setWashPoint(ctx, { x: sx, y: sy });
+        }
+        st.dragKey = null;
+      }
+      return;
+    }
+
+    if(st.phase === 'slide'){
+      const onChick = ev.target.closest('#chick') || (type === 'down' && pt.x < 280);
+      if(type === 'down' && onChick){
+        st.dragKey = 'slide';
+        st.downPt = { x: pt.x, y: pt.y };
+        Stage.clearFinger();
+        return;
+      }
+      if(type === 'move' && st.dragKey === 'slide'){
+        const dx = pt.x - st.downPt.x;
+        const before = st.slideProgress;
+        st.slideProgress = clamp(st.slideProgress + dx / 220, before, 1);
+        st.downPt = { x: pt.x, y: pt.y };
+        if(Math.floor(st.slideProgress * 18) % 2 === 0) AUDIO.play('slide');
+      }
+      if(type === 'up' || type === 'cancel'){
+        st.dragKey = null;
+      }
+      return;
+    }
+
+    if(st.phase === 'find'){
+      const onMag = ev.target.closest('#magG') || dist(pt.x, pt.y, 720, 316) < 200;
+      if(type === 'down' && onMag){
+        st.dragKey = 'mag';
+        st.dragOff = { x: pt.x - 720, y: pt.y - 316 };
+        Stage.clearFinger();
+      }
+      if(type === 'move' && st.dragKey === 'mag'){
+        const mx = clamp(pt.x - st.dragOff.x, 200, 900), my = clamp(pt.y - st.dragOff.y, 200, 560);
+        $('#magG').setAttribute('transform', `translate(${mx} ${my})`);
+        this.checkMagnifier(ctx, pt);
+      }
+      if(type === 'up' || type === 'cancel'){
+        st.dragKey = null;
+      }
+    }
+  },
+  update(dt, ctx){
+    const st = ctx.state;
+    if(st.phase === 'slide'){
+      const track = $('#trackRail');
+      if(track){
+        const len = track.getTotalLength();
+        const p = track.getPointAtLength(st.slideProgress * len);
+        const chick = $('#chick');
+        if(chick) chick.setAttribute('transform', `translate(${p.x} ${p.y - 4}) scale(0.74) rotate(${st.slideProgress * 20})`);
+      }
+      if(st.slideProgress >= 0.985) this.toFind(ctx);
+    }
+  },
+  leave(){}
+};
+
+/* ============================================================
+   10.7 第 6 关：炸弹搬到外面
+   卡通搬运器吸炸弹 → 移到屋外安全垫 → 左滑关门
+   ============================================================ */
+const Level6 = {
+  key:'L6',
+  createState(){
+    return { bombs:[{x:200,y:430,placed:false},{x:300,y:430,placed:false},{x:400,y:430,placed:false}],
+             carrying:-1, dragKey:null, dragOff:null, doorProg:0, doorLocked:false, done:false };
+  },
+  enter(ctx){
+    const st = ctx.state;
+    Stage.setScene(`
+      <defs><linearGradient id="sky6" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#EAF7FF"/><stop offset="1" stop-color="#D7F0FF"/></linearGradient>
+        <clipPath id="houseClip"><rect x="0" y="0" width="1024" height="500"/></clipPath>
+      </defs>
+      <rect x="0" y="0" width="1024" height="768" fill="url(#sky6)"/>
+      ${cloudSVG(200, 130, 1, .9)} ${cloudSVG(700, 100, .8, .85)}
+
+      <!-- 屋外 -->
+      <path d="M0,560 C260,540 520,580 1024,540 L1024,768 L0,768 Z" fill="#A8E06A"/>
+      <path d="M0,560 C260,540 520,580 1024,540 L1024,584 C520,608 260,564 0,584 Z" fill="#8ACF52"/>
+
+      <!-- 屋内/屋面 -->
+      ${houseSVG(220, 460, 1.2, { warm:false })}
+      <g id="door6" transform="translate(310 380)">
+        <rect x="-44" y="-100" width="88" height="160" rx="16" fill="#E0BE85" stroke="#C08F55" stroke-width="8"/>
+        <rect x="-36" y="-92" width="72" height="152" rx="12" fill="#F3DDB8"/>
+        <circle cx="34" cy="0" r="6" fill="#5B4632"/>
+        <g class="handle-hint" opacity="0">
+          <path d="M-12,80 L36,80" stroke="#FF9A3C" stroke-width="9" stroke-linecap="round"/>
+          <path d="M30,70 L42,80 L30,90 Z" fill="#FF9A3C"/>
+        </g>
+      </g>
+      <g id="window6">
+        <rect x="430" y="320" width="120" height="120" rx="18" fill="#CFEEFF" stroke="#9FD3E6" stroke-width="8"/>
+        <line x1="490" y1="320" x2="490" y2="440" stroke="#9FD3E6" stroke-width="6"/>
+        <line x1="430" y1="380" x2="550" y2="380" stroke="#9FD3E6" stroke-width="6"/>
+      </g>
+
+      <!-- 屋内桌面 + 三个炸弹 + 小鸡 -->
+      <g id="table6" clip-path="url(#houseClip)">
+        <rect x="0" y="520" width="500" height="80" fill="#C98A55"/>
+        <rect x="0" y="560" width="500" height="40" fill="#A96C3C"/>
+        <g id="bombsLayer"></g>
+        <g id="chickSlot"></g>
+      </g>
+
+      <!-- 搬运器（在屋内，从右到左移动） -->
+      <g id="porter">
+        <rect x="-60" y="-30" width="120" height="60" rx="16" fill="#B98A4E" stroke="#7E5C2E" stroke-width="6"/>
+        <circle class="star-sucker" cx="0" cy="-50" r="20" fill="#FFD35C" stroke="#E39A2A" stroke-width="5"/>
+        <path d="${STAR_PATH}" fill="#fff" stroke="#E39A2A" stroke-width="2.2" transform="scale(1.2)"/>
+        <rect class="rail-hit" x="-50" y="-20" width="100" height="40" fill="transparent"/>
+      </g>
+
+      <!-- 安全垫（屋外） -->
+      <g id="pads">
+        <g transform="translate(720 600)">
+          <circle r="56" fill="#FFF7E6" stroke="#FFD35C" stroke-width="8" stroke-dasharray="20 14"/>
+          <path d="M-22,4 L-4,22 L24,-18" fill="none" stroke="#5FA637" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>
+          <text y="48" font-size="22" font-weight="900" fill="#8A7460" text-anchor="middle" paint-order="stroke fill" stroke="#fff" stroke-width="6">垫子1</text>
+        </g>
+        <g transform="translate(880 660)">
+          <circle r="56" fill="#FFF7E6" stroke="#FFD35C" stroke-width="8" stroke-dasharray="20 14"/>
+          <path d="M-22,4 L-4,22 L24,-18" fill="none" stroke="#5FA637" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>
+          <text y="48" font-size="22" font-weight="900" fill="#8A7460" text-anchor="middle" paint-order="stroke fill" stroke="#fff" stroke-width="6">垫子2</text>
+        </g>
+        <g transform="translate(740 720)">
+          <circle r="56" fill="#FFF7E6" stroke="#FFD35C" stroke-width="8" stroke-dasharray="20 14"/>
+          <path d="M-22,4 L-4,22 L24,-18" fill="none" stroke="#5FA637" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>
+          <text y="48" font-size="22" font-weight="900" fill="#8A7460" text-anchor="middle" paint-order="stroke fill" stroke="#fff" stroke-width="6">垫子3</text>
+        </g>
+      </g>
+
+      <!-- 关门滑块提示 -->
+      <g id="lockG" opacity="0">
+        <rect x="280" y="660" width="380" height="44" rx="22" fill="#FFFFFF" stroke="#FFD35C" stroke-width="6"/>
+        <rect id="lockFill" x="284" y="664" width="6" height="36" rx="18" fill="#8ED45C"/>
+        <text x="470" y="690" font-size="22" font-weight="900" fill="#4A3728" text-anchor="middle" paint-order="stroke fill" stroke="#fff" stroke-width="5">按住滑到右边锁门</text>
+      </g>
+    `);
+    const layer = $('#bombsLayer');
+    st.bombs.forEach((b, i) => {
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('class','bomb');
+      g.setAttribute('data-bomb', i);
+      g.setAttribute('transform', `translate(${b.x} ${b.y})`);
+      const r = i === 1 ? 30 : 24;
+      g.innerHTML = `
+        <circle cx="${-r*0.3}" cy="${-r*0.4}" r="${r*0.6}" fill="rgba(74,55,40,.18)"/>
+        <circle cx="0" cy="0" r="${r}" fill="#3E2A20"/>
+        <circle cx="${-r*0.32}" cy="${-r*0.32}" r="${r*0.35}" fill="#FFFFFF" opacity=".25"/>
+        <rect x="${-3}" y="${-r-12}" width="6" height="14" rx="3" fill="#A96C3C"/>
+        <circle cx="0" cy="${-r-16}" r="6" fill="#FFDD5C"/>
+        <circle cx="3" cy="${-r-19}" r="3" fill="#FF9A3C"/>
+        <rect class="hit" x="${-r-8}" y="${-r-22}" width="${r*2+16}" height="${r*2+30}" fill="transparent"/>`;
+      layer.appendChild(g);
+    });
+    $('#chickSlot').innerHTML = chickSVG('wait', { x:0, y0:0, scale:0.72, id:'chick' });
+    $('#chick').setAttribute('transform','translate(140 530) scale(0.72)');
+    $('#porter').setAttribute('transform','translate(60 460)');
+    Stage.setHint(260, 380, '拖搬运器吸炸弹');
+  },
+  snap(b){
+    return { x: b.x, y: b.y, placed: b.placed };
+  },
+  handlePointer(type, pt, ev, ctx){
+    const st = ctx.state;
+    if(st.done) return;
+
+    const allPlaced = st.bombs.every(b => b.placed);
+
+    if(!allPlaced){
+      const onPorter = ev.target.closest('#porter');
+      const onBomb = type === 'down' ? ev.target.closest('.bomb') : null;
+
+      if(type === 'down' && (onPorter || st.carrying >= 0 || onBomb)){
+        st.dragKey = 'porter';
+        // 当前搬运器位置
+        const tf = $('#porter').getAttribute('transform');
+        const m = /translate\(([-\d.]+)[ ,]*([-\d.]+)\)/.exec(tf);
+        const px = m ? +m[1] : 60, py = m ? +m[2] : 460;
+        st.dragOff = { x: pt.x - px, y: pt.y - py };
+        // 接近某个炸弹则吸上
+        for(let i = 0; i < st.bombs.length; i++){
+          if(st.bombs[i].placed) continue;
+          if(st.carrying < 0 && dist(pt.x, pt.y, st.bombs[i].x, st.bombs[i].y) < 80){
+            st.carrying = i;
+            AUDIO.play('pickup');
+            break;
+          }
+        }
+        Stage.clearFinger();
+        return;
+      }
+
+      if(type === 'move' && st.dragKey === 'porter'){
+        const px = clamp(pt.x - st.dragOff.x, 30, 970), py = clamp(pt.y - st.dragOff.y, 280, 700);
+        $('#porter').setAttribute('transform', `translate(${px} ${py})`);
+        if(st.carrying >= 0){
+          const b = st.bombs[st.carrying];
+          b.x = px; b.y = py - 56;
+          $(`[data-bomb="${st.carrying}"]`).setAttribute('transform', `translate(${b.x} ${b.y})`);
+        }
+        return;
+      }
+
+      if(type === 'up' || type === 'cancel'){
+        if(st.carrying >= 0){
+          const pads = document.querySelectorAll('#pads > g');
+          let best = -1, bd = 1e9;
+          pads.forEach((p, i) => {
+            const r = p.getBoundingClientRect();
+            const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+            const bpos = { x: st.bombs[st.carrying].x, y: st.bombs[st.carrying].y };
+            const d = dist(bpos.x, bpos.y, cx, cy);
+            if(d < bd){ bd = d; best = i; }
+          });
+          const R = runtime.assist ? 130 : 90;
+          if(best >= 0 && bd < R){
+            const pad = pads[best].getBoundingClientRect();
+            const cx = pad.x + pad.width / 2, cy = pad.y + pad.height / 2;
+            const b = st.bombs[st.carrying];
+            b.x = cx; b.y = cy;
+            b.placed = true;
+            $(`[data-bomb="${st.carrying}"]`).setAttribute('transform', `translate(${cx} ${cy})`);
+            AUDIO.play('cheer');
+            Stage.stars(cx, cy, 8);
+            st.carrying = -1;
+            if(st.bombs.every(o => o.placed)){
+              // 出现关门提示
+              const lock = $('#lockG');
+              if(lock) lock.setAttribute('opacity','1');
+              const hh = $('#door6 .handle-hint');
+              if(hh) hh.setAttribute('opacity','1');
+              Stage.setHint(470, 600, '按住滑到右边锁门');
+              say('炸弹都在屋外啦');
+            }
+          }else{
+            // 没落到垫子上：吸在搬运器上方
+            st.carrying = -1;
+          }
+        }
+        st.dragKey = null;
+      }
+      return;
+    }
+
+    // 关门
+    if(!st.doorLocked){
+      const onDoor = ev.target.closest('#door6') || dist(pt.x, pt.y, 310, 380) < 160;
+      if(type === 'down' && onDoor){
+        st.dragKey = 'door';
+        st.downPt = { x: pt.x };
+        Stage.clearFinger();
+        return;
+      }
+      if(type === 'move' && st.dragKey === 'door'){
+        const dx = pt.x - st.downPt.x;
+        st.doorProg = clamp(st.doorProg + dx / 220, 0, 1);
+        st.downPt = { x: pt.x };
+        const door = $('#door6');
+        if(door) door.setAttribute('transform', `translate(${310 + 90 * st.doorProg} 380) rotate(${st.doorProg * 8})`);
+        const lf = $('#lockFill');
+        if(lf) lf.setAttribute('width', String(6 + 360 * st.doorProg));
+        if(st.doorProg > 0.97){
+          st.doorLocked = true;
+          AUDIO.play('pickup');
+          Stage.stars(310 + 90, 380, 8);
+          say('门锁好啦');
+          setTimeout(() => ctx.complete(), 900);
+        }
+      }
+      if(type === 'up' || type === 'cancel'){
+        st.dragKey = null;
+      }
+    }
+  },
+  leave(){}
+};
+
+/* ============================================================
+   10.8 第 7 关：结局 —— 轰隆回家玩
+   ============================================================ */
+const Level7 = {
+  key:'L7',
+  createState(){
+    return { phase:'wait', waitProg:0, sip:false, ball:false, wind:false, blocks:false,
+             bombsGone:false, sipProg:0, downPt:null, dragKey:null, done:false };
+  },
+  enter(ctx){
+    Stage.setScene(`
+      <defs><linearGradient id="roomG7" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#FFF6E4"/><stop offset="1" stop-color="#FFEDCE"/></linearGradient></defs>
+      <rect x="0" y="0" width="1024" height="768" fill="url(#roomG7)"/>
+      <rect x="0" y="0" width="1024" height="500" fill="#FFF6E4"/>
+      <rect x="60" y="80" width="240" height="160" rx="20" fill="#CFEEFF" stroke="#9FD3E6" stroke-width="8"/>
+      <path d="M260,150 C320,120 360,180 420,140" stroke="#9FD3E6" stroke-width="6" fill="none"/>
+
+      <!-- 桌子 -->
+      <rect x="0" y="540" width="1024" height="60" rx="20" fill="#C98A55"/>
+      <rect x="0" y="600" width="1024" height="168" fill="#A96C3C"/>
+
+      <!-- 玻璃罐 + 吸管 -->
+      <g id="jar7" transform="translate(310 580)">
+        ${glassJarSVG('jarClip7')}
+        <use href="#jarFill" y="-258"/>
+        <g id="straw7" transform="translate(-4 340)">
+          <rect x="-7" y="-4" width="14" height="240" rx="6" fill="#FFFFFF" stroke="#9FD3E6" stroke-width="5"/>
+          <rect x="-7" y="-4" width="14" height="50" rx="6" fill="#FF8A6B"/>
+        </g>
+      </g>
+
+      <!-- 关着的门 -->
+      <g id="door7" transform="translate(740 540)">
+        <rect x="-50" y="-130" width="100" height="160" rx="16" fill="#E0BE85" stroke="#C08F55" stroke-width="8"/>
+        <rect x="-42" y="-122" width="84" height="152" rx="12" fill="#F3DDB8"/>
+        <circle cx="40" cy="0" r="6" fill="#5B4632"/>
+        <circle class="peep" cx="0" cy="0" r="22" fill="#FFDD5C" opacity="0"/>
+      </g>
+
+      <!-- 等待轨道 -->
+      <g id="waitBeads" transform="translate(512 220)">
+        ${[0,1,2,3,4].map(i=>`<circle class="bead" cx="${(i-2)*72}" cy="0" r="22" fill="#E0BE85" stroke="#C08F55" stroke-width="5"/>`).join('')}
+      </g>
+
+      <!-- 爆炸闪光 -->
+      <g id="boomFx" opacity="0">
+        <circle cx="740" cy="500" r="40" fill="#FFFFFF"/>
+        <circle cx="740" cy="500" r="80" fill="#FFE9A8" opacity=".7"/>
+      </g>
+      <g id="ringsFx"></g>
+
+      <!-- 小鸡 + 玩 -->
+      <g id="chickSlot"></g>
+
+      <!-- 玩具：球、风车、积木 -->
+      <g id="toys">
+        <g id="ball" transform="translate(800 600)" class="draggable" style="cursor:grab">
+          <circle class="hit" r="60" fill="transparent"/>
+          <circle r="40" fill="#FF8A6B" stroke="#E66041" stroke-width="5"/>
+          <path d="M-22,-12 a30,30 0 0 1 44,0" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+          <path d="M-22,12 a30,30 0 0 0 44,0" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+        </g>
+        <g id="windmill" transform="translate(880 590)" class="draggable" style="cursor:grab">
+          <rect x="-8" y="-10" width="16" height="80" rx="6" fill="#A96C3C"/>
+          <g id="blades" transform="translate(0 -36)">
+            <ellipse rx="36" ry="14" fill="#6BC6F0" stroke="#3FA8D2" stroke-width="4"/>
+            <ellipse rx="36" ry="14" fill="#FFDD5C" stroke="#E3B23C" stroke-width="4" transform="rotate(60)"/>
+            <ellipse rx="36" ry="14" fill="#FF8A6B" stroke="#E66041" stroke-width="4" transform="rotate(120)"/>
+            <circle r="10" fill="#FFD35C" stroke="#E39A2A" stroke-width="3"/>
+            <circle class="hit" r="50" fill="transparent"/>
+          </g>
+        </g>
+        <g id="blocks" transform="translate(560 660)">
+          <g class="block draggable" style="cursor:grab" data-b="0">
+            <rect class="hit" x="-32" y="-32" width="64" height="64" fill="transparent"/>
+            <rect x="-26" y="-26" width="52" height="52" rx="6" fill="#8ED45C" stroke="#5FA637" stroke-width="4"/>
+            <text y="6" font-size="28" font-weight="900" fill="#fff" text-anchor="middle">A</text>
+          </g>
+          <g class="block draggable" style="cursor:grab" data-b="1" transform="translate(80 0)">
+            <rect class="hit" x="-32" y="-32" width="64" height="64" fill="transparent"/>
+            <rect x="-26" y="-26" width="52" height="52" rx="6" fill="#FFB35C" stroke="#E39A2A" stroke-width="4"/>
+            <text y="6" font-size="28" font-weight="900" fill="#fff" text-anchor="middle">B</text>
+          </g>
+        </g>
+      </g>
+
+      <!-- 长按进度环 -->
+      <g id="sipRingG" transform="translate(306 410)" opacity="0">
+        <circle r="56" fill="none" stroke="#FFFFFF" stroke-width="9"/>
+        <circle id="sipRingFill" r="56" fill="none" stroke="#8ED45C" stroke-width="9" stroke-linecap="round"
+                stroke-dasharray="352" stroke-dashoffset="352" pathLength="352" transform="rotate(-90)"/>
+      </g>
+    `);
+    $('#chickSlot').innerHTML = chickSVG('wait', { x:0, y0:0, scale:0.76, id:'chick' });
+    $('#chick').setAttribute('transform','translate(440 540) scale(0.76)');
+    Stage.setHint(512, 130, '等炸弹爆飞');
+  },
+  spawnRing(){
+    const g = $('#ringsFx');
+    if(!g) return;
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx', 740); c.setAttribute('cy', 500); c.setAttribute('r', 8);
+    c.setAttribute('class','sparkle-ring');
+    c.setAttribute('fill','none');
+    c.setAttribute('stroke','#FFFFFF');
+    c.setAttribute('stroke-width','12');
+    g.appendChild(c);
+    setTimeout(() => c.remove(), 760);
+  },
+  boom(ctx){
+    const st = ctx.state;
+    if(st.bombsGone) return;
+    st.bombsGone = true;
+    AUDIO.play('boom');
+    Stage.setHint(740, 410, '炸飞啦！');
+    const fx = $('#boomFx');
+    if(fx) fx.setAttribute('opacity','1');
+    for(let i = 0; i < 4; i++) setTimeout(() => this.spawnRing(), i * 110);
+    // 炸弹飞走成烟圈
+    const peek = $('#door7 .peep');
+    if(peek){ peek.setAttribute('opacity','0'); }
+    const chick = $('#chick');
+    if(chick) chick.classList.add('jump-anim');
+    setTimeout(() => {
+      AUDIO.play('cheer');
+      Stage.stars(740, 480, 16);
+      Stage.stars(740, 380, 12);
+      Stage.stars(680, 460, 10);
+      Stage.stars(820, 460, 10);
+      Stage.setHint(440, 200, '喝可乐，玩');
+      const sr = $('#sipRingG');
+      if(sr) sr.setAttribute('opacity','1');
+      st.phase = 'free';
+      // 小鸡欢呼 + 移到喝可乐位
+      const slot = $('#chickSlot');
+      if(slot) slot.innerHTML = chickSVG('cheer', { x:0, y0:0, scale:0.76, id:'chick' });
+      $('#chick').setAttribute('transform','translate(440 540) scale(0.76)');
+      chick.classList.remove('jump-anim');
+    }, 1400);
+  },
+  update(dt, ctx){
+    const st = ctx.state;
+    if(st.phase === 'wait'){
+      // 自动推进；按着玻璃罐更快
+      st.waitProg = clamp(st.waitProg + dt * (st.dragKey === 'sip' ? 0.6 : 0.18), 0, 1);
+      const beads = document.querySelectorAll('#waitBeads .bead');
+      beads.forEach((b, i) => {
+        const lit = i <= Math.floor(st.waitProg * (beads.length - 1));
+        if(lit && b.getAttribute('fill') !== '#FFD35C'){
+          b.setAttribute('fill','#FFD35C'); b.setAttribute('stroke','#E39A2A');
+        }else if(!lit && b.getAttribute('fill') !== '#E0BE85'){
+          b.setAttribute('fill','#E0BE85'); b.setAttribute('stroke','#C08F55');
+        }
+      });
+      if(st.waitProg >= 0.999) this.boom(ctx);
+    }
+    if(st.phase === 'free' && st.sip){
+      st.sipProg = clamp(st.sipProg + dt * 1.4, 0, 1);
+      const ring = $('#sipRingFill');
+      if(ring) ring.setAttribute('stroke-dashoffset', String(352 * (1 - st.sipProg)));
+      if(st.sipProg >= 1){ st.sipProg = 1; this.checkFinish(ctx); }
+    }
+    if(st.phase === 'free'){
+      // 风车持续转
+      const blades = $('#blades');
+      if(blades){
+        const a = (parseFloat(blades.getAttribute('data-rot') || '0') + dt * 220) % 360;
+        blades.setAttribute('data-rot', String(a));
+        blades.setAttribute('transform', `translate(0 -36) rotate(${a})`);
+      }
+    }
+  },
+  checkFinish(ctx){
+    const st = ctx.state;
+    const ok = st.sip && (st.ball || st.wind || st.blocks);
+    if(ok && !st.done){ this.finish(ctx); }
+  },
+  finish(ctx){
+    const st = ctx.state;
+    if(st.done) return;
+    st.done = true;
+    AUDIO.play('cheer');
+    Stage.stars(440, 540, 14);
+    Stage.stars(800, 600, 8);
+    Stage.stars(880, 560, 8);
+    Stage.stars(560, 660, 8);
+    setTimeout(() => ctx.complete(), 1500);
+  },
+  handlePointer(type, pt, ev, ctx){
+    const st = ctx.state;
+    if(st.done) return;
+
+    if(st.phase === 'wait'){
+      const onJar = dist(pt.x, pt.y, 306, 410) < 220 || ev.target.closest('#jar7');
+      if(type === 'down' && onJar){
+        st.dragKey = 'sip';
+        Stage.clearFinger();
+      }
+      if(type === 'up' || type === 'cancel'){ st.dragKey = null; }
+      return;
+    }
+
+    // free 阶段：长按罐子 → 喝可乐；点/拖玩具
+    const jar = dist(pt.x, pt.y, 306, 410) < 220 || ev.target.closest('#jar7');
+    if(type === 'down' && jar){
+      st.dragKey = 'sip';
+      st.sip = true;
+      $('#sipRingG').setAttribute('opacity','1');
+      Stage.clearFinger();
+      return;
+    }
+    if(type === 'up' || type === 'cancel' && st.dragKey === 'sip'){ st.dragKey = null; return; }
+
+    const ball = ev.target.closest('#ball');
+    if(type === 'down' && ball){
+      st.dragKey = 'ball'; st.dragOff = { x: 800 - pt.x, y: 600 - pt.y }; st.downPt = { x: pt.x, y: pt.y };
+    }
+    if(type === 'move' && st.dragKey === 'ball'){
+      $('#ball').setAttribute('transform', `translate(${pt.x + st.dragOff.x} ${pt.y + st.dragOff.y})`);
+    }
+    if(type === 'up' && st.dragKey === 'ball'){
+      const dx = pt.x - st.downPt.x, dy = pt.y - st.downPt.y;
+      if(Math.hypot(dx, dy) > 30){ st.ball = true; AUDIO.play('spark'); Stage.stars(pt.x + st.dragOff.x, pt.y + st.dragOff.y, 5); this.checkFinish(ctx); }
+    }
+
+    const wind = ev.target.closest('#windmill .hit, #windmill');
+    if(type === 'down' && wind){ st.wind = true; AUDIO.play('spark'); Stage.stars(880, 540, 4); this.checkFinish(ctx); }
+
+    const blk = ev.target.closest('.block');
+    if(blk){
+      if(type === 'down'){ st.dragKey = 'block:' + blk.dataset.b; const t = blk.getAttribute('transform')||'translate(0 0)'; const m=/translate\(([-\d.]+)[ ,]*([-\d.]+)\)/.exec(t); const bx = m?+m[1]:0, by=m?+m[2]:0; st.dragOff = { x: bx - pt.x, y: by - pt.y }; st.downPt = { x: pt.x, y: pt.y }; }
+      if(type === 'move' && st.dragKey === 'block:' + blk.dataset.b){
+        blk.setAttribute('transform', `translate(${pt.x + st.dragOff.x} ${pt.y + st.dragOff.y})`);
+      }
+      if(type === 'up' && st.dragKey === 'block:' + blk.dataset.b){
+        if(dist(pt.x, pt.y, st.downPt.x, st.downPt.y) > 30){
+          st.blocks = true; AUDIO.play('spark'); Stage.stars(pt.x + st.dragOff.x, pt.y + st.dragOff.y, 5); this.checkFinish(ctx);
+        }
+      }
+    }
+    if(type === 'cancel'){ st.dragKey = null; }
+  },
+  leave(){}
+};
+
+const IMPL = { '01-find-cola': Level1, '02-cart-home': Level2, '03-glass-pour': Level3,
+                '04-every-day': Level4, '05-slide-rainbow': Level5, '06-bomb-out': Level6, '07-boom-home': Level7 };
+
+/* ============================================================
+   11. 状态机 / 屏幕切换
+   ============================================================ */
+function show(name){
+  runtime.screen = name;
+  els.title.hidden = (name !== 'TITLE');
+  els.map.hidden   = (name !== 'MAP');
+  els.play.hidden  = (name !== 'PLAY');
+  if(name !== 'PLAY') stopLoop();
+}
+function stopLoop(){
+  if(runtime.raf){ cancelAnimationFrame(runtime.raf); runtime.raf = 0; }
+}
+
+function startLevel(index){
+  const def = LEVELS[index];
+  const impl = IMPL[def.id];
+  if(def.locked || index >= PLAYABLE || !impl){
+    // 未开放：给一点柔和反馈，不算失败
+    const node = $(`#mapNode-${index}`);
+    if(node){ node.classList.add('shake'); setTimeout(() => node.classList.remove('shake'), 520); }
+    AUDIO.play('tap');
+    return;
+  }
+  stopLoop();
+  if(runtime.level && runtime.level.leave) runtime.level.leave();
+  runtime.levelIndex = index;
+  runtime.level = impl;
+  runtime.levelState = impl.createState();
+  runtime.inputEnabled = true;
+  runtime.completionLocked = false;
+  runtime.assist = false;
+  runtime.pointerId = null;
+  runtime.pointerDown = false;
+  Save.data.lastLevel = def.id;
+  Save.write();
+
+  els.hudNo.textContent = def.no;
+  els.hudTitle.textContent = def.title;
+  Stage.clear();
+  show('PLAY');
+  impl.enter(ctx);
+  runtime.lastTouch = performance.now();
+  runtime.lastT = performance.now();
+  // 第 6 关（idx===5）首次进入时弹安全卡
+  if(index === 5) maybeShowSafety();
+  loop();
+}
+
+const ctx = {
+  get state(){ return runtime.levelState; },
+  set state(v){ runtime.levelState = v; },
+  complete(){ completeLevel(); },
+  assist(){ return runtime.assist; },
+};
+
+function completeLevel(){
+  if(runtime.completionLocked) return;
+  runtime.completionLocked = true;
+  runtime.inputEnabled = false;
+  const idx = runtime.levelIndex, def = LEVELS[idx];
+  if(Save.data.completed.indexOf(def.id) < 0) Save.data.completed.push(def.id);
+  Save.data.highestUnlocked = clamp(Math.max(Save.data.highestUnlocked, idx + 1), 0, 6);
+  Save.write();
+  AUDIO.play('cheer');
+  say('过关啦');
+  els.resultTitle.textContent = ['太棒啦！','真厉害！','好开心呀！'][idx % 3];
+  els.resultText.textContent = def.resultText;
+  els.resultArt.innerHTML = `<svg viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="94" fill="#FFF0C4"/>
+      ${('<g transform="translate(100 178) scale(0.72)">' + require_chick('cheer') + '</g>')}
+      <g>${[0,1,2,3,4,5].map(i=>{
+        const a = -Math.PI/2 + i * Math.PI/3, r = 74;
+        return `<path d="${STAR_PATH}" transform="translate(${(100+Math.cos(a)*r).toFixed(1)} ${(100+Math.sin(a)*r).toFixed(1)}) scale(1.3)" fill="#FFD35C" stroke="#E39A2A" stroke-width="1.6"/>`;
+      }).join('')}</g></svg>`;
+  els.result.hidden = false;
+  stopLoop();
+}
+/* 便于结果页复用小鸡（避免命名冲突） */
+function require_chick(pose){ return chickSVG(pose, { x:0, y0:0, scale:1 }).replace(/^<g[^>]*>/, '').replace(/<\/g>$/, ''); }
+
+function backToMap(){
+  stopLoop();
+  if(runtime.level && runtime.level.leave) runtime.level.leave();
+  runtime.level = null; runtime.levelIndex = null; runtime.levelState = null;
+  els.result.hidden = true;
+  Stage.clear();
+  renderMap();
+  show('MAP');
+}
+
+/* ============================================================
+   12. 地图
+   ============================================================ */
+const MAP_POINTS = [
+  [110, 520], [286, 452], [452, 498], [628, 470], [800, 396], [892, 248], [610, 148]
+];
+function smoothPath(pts){
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for(let i = 1; i < pts.length; i++){
+    const p0 = pts[i - 1], p1 = pts[i];
+    const cx = (p0[0] + p1[0]) / 2, cy = (p0[1] + p1[1]) / 2;
+    d += ` Q${p0[0] + (p1[0] - p0[0]) * 0.35},${p0[1] + (p1[1] - p0[1]) * 0.6} ${cx},${cy}`;
+    d += ` Q${p1[0] - (p1[0] - p0[0]) * 0.35},${p1[1] - (p1[1] - p0[1]) * 0.6} ${p1[0]},${p1[1]}`;
+  }
+  return d;
+}
+function renderMap(){
+  const d = smoothPath(MAP_POINTS);
+  let nodes = '';
+  LEVELS.forEach((lv, i) => {
+    const p = MAP_POINTS[i];
+    const playable = i < PLAYABLE;
+    const unlocked = i <= Save.data.highestUnlocked && playable;
+    const done = Save.data.completed.indexOf(lv.id) >= 0;
+    const state = !playable || i > Save.data.highestUnlocked ? 'locked' : (done ? 'done' : 'unlocked');
+    const badge = !playable
+      ? `<g transform="translate(${p[0]} ${p[1]})"><rect x="-26" y="-30" width="52" height="52" rx="14" fill="#B0A79E" stroke="#8E8478" stroke-width="5"/>
+         <path d="M-14,-4 V-16 a14,14 0 0 1 28,0 V-4" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+         <rect x="-18" y="-4" width="36" height="30" rx="9" fill="#fff"/></g>`
+      : (done
+        ? `<path d="${STAR_PATH}" transform="translate(${p[0]} ${p[1]}) scale(3.4)" fill="#FFFFFF" stroke="#C8860B" stroke-width="1.6"/>`
+        : `<text x="${p[0]}" y="${p[1] + 18}" font-size="46" font-weight="900" fill="#FFFFFF" text-anchor="middle"
+             paint-order="stroke fill" stroke="#E39A2A" stroke-width="7">${lv.no}</text>`);
+    nodes += `<g class="map-node ${state}" id="mapNode-${i}" data-i="${i}" role="button"
+                aria-label="第${lv.no}关 ${lv.title}${state==='locked'?' 还没开放':''}">
+      <circle class="node-hit" cx="${p[0]}" cy="${p[1]}" r="82"/>
+      <g class="node-disc">
+        <circle class="node-body" cx="${p[0]}" cy="${p[1]}" r="62"/>
+        ${badge}
+      </g>
+      <text class="node-label" x="${p[0]}" y="${p[1] + 104}">${lv.title}</text>
+    </g>`;
+  });
+  els.mapStage.innerHTML = `
+    ${rainbowSVG(430, 60, .46)}
+    ${cloudSVG(180, 96, 1.1, .95)} ${cloudSVG(700, 70, .85, .85)}
+    <circle cx="90" cy="90" r="46" fill="#FFDD5C"/>
+    <g class="decor">${treeSVG(960, 470, .7)}${treeSVG(60, 470, .6)}</g>
+    <path id="mapPathBase" d="${d}"/>
+    <path id="mapPath" d="${d}"/>
+    ${nodes}
+  `;
+  els.mapStage.querySelectorAll('.map-node').forEach(n => {
+    n.addEventListener('click', () => {
+      AUDIO.unlock();
+      startLevel(+n.dataset.i);
+    });
+  });
+}
+
+/* ============================================================
+   13. Pointer 统一输入层
+   ============================================================ */
+function toSvgPoint(svg, ev){
+  const pt = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY;
+  const m = svg.getScreenCTM();
+  return m ? pt.matrixTransform(m.inverse()) : { x:0, y:0 };
+}
+const stage = els.stage;
+stage.addEventListener('pointerdown', ev => {
+  if(!runtime.inputEnabled || runtime.screen !== 'PLAY') return;
+  if(runtime.pointerId !== null) return;          // 只接受一个主指针
+  runtime.pointerId = ev.pointerId;
+  runtime.pointerDown = true;
+  try{ stage.setPointerCapture(ev.pointerId); }catch(e){}
+  runtime.lastTouch = performance.now();
+  if(runtime.level) runtime.level.handlePointer('down', toSvgPoint(stage, ev), ev, ctx);
+  ev.preventDefault();
+}, { passive:false });
+
+/* 在 window 上接收 move/up，这样即使 pointer capture 被系统提前释放也不会断掉拖拽 */
+window.addEventListener('pointermove', ev => {
+  if(ev.pointerId !== runtime.pointerId || !runtime.pointerDown || !runtime.inputEnabled) return;
+  if(runtime.screen !== 'PLAY') return;
+  runtime.lastTouch = performance.now();
+  if(runtime.level) runtime.level.handlePointer('move', toSvgPoint(stage, ev), ev, ctx);
+});
+
+function endPointer(ev, type){
+  if(ev.pointerId !== runtime.pointerId) return;
+  runtime.pointerId = null;
+  runtime.pointerDown = false;
+  runtime.lastTouch = performance.now();
+  try{ stage.releasePointerCapture(ev.pointerId); }catch(e){}
+  if(runtime.level) runtime.level.handlePointer(type, toSvgPoint(stage, ev), ev, ctx);
+}
+window.addEventListener('pointerup',     ev => { if(runtime.pointerDown) endPointer(ev, 'up'); });
+window.addEventListener('pointercancel', ev => { if(runtime.pointerDown) endPointer(ev, 'cancel'); });
+/* 切后台 / 来电等异常中断的安全兜底：彻底松手状态才清理，不误伤正在进行的拖拽 */
+window.addEventListener('blur', () => {
+  if(runtime.level && runtime.pointerDown){
+    runtime.pointerDown = false; runtime.pointerId = null;
+    try{ runtime.level.handlePointer('cancel', {x:0,y:0}, { target: stage }, ctx); }catch(e){}
+  }
+});
+
+/* ============================================================
+   14. 主循环 + 渐进提示
+   ============================================================ */
+let hintStage = 0;
+function loop(){
+  runtime.raf = requestAnimationFrame(loop);
+  const now = performance.now();
+  const dt = Math.min((now - runtime.lastT) / 1000, 0.05);
+  runtime.lastT = now;
+
+  if(runtime.level && runtime.level.update) runtime.level.update(dt, ctx);
+
+  // 渐进式帮助：4s 呼吸 / 8s 手指 / 12s 放大吸附
+  const idle = now - runtime.lastTouch;
+  if(idle > 12000) runtime.assist = true;
+  const stageNum = idle > 12000 ? 3 : (idle > 8000 ? 2 : (idle > 4000 ? 1 : 0));
+  if(stageNum !== hintStage){
+    hintStage = stageNum;
+    if(stageNum >= 2){
+      Stage.clearFinger();
+      const spot = currentHintSpot();
+      if(spot) Stage.showFinger(spot.x, spot.y);
+    }else{
+      Stage.clearFinger();
+    }
+  }
+}
+function currentHintSpot(){
+  const idx = runtime.levelIndex;
+  if(idx === 0){
+    const st = runtime.levelState;
+    if(!st) return null;
+    if(st.step === 'go-out') return { x: 300, y: 620 };
+    const firstOpen = ['bush','cloth','box'].find(k => !st.covers[k]);
+    if(firstOpen === 'bush')  return { x: 560, y: 570 };
+    if(firstOpen === 'cloth') return { x: 740, y: 585 };
+    if(firstOpen === 'box')   return { x: 900, y: 540 };
+    return null;
+  }
+  if(idx === 1){
+    const st = runtime.levelState;
+    if(!st) return null;
+    const loaded = st.cans.filter(c => c.loaded).length;
+    if(loaded >= 5) return { x: 700, y: 590 };
+    const next = st.cans.find(c => !c.loaded);
+    return next ? { x: next.x, y: next.y - 50 } : null;
+  }
+  if(idx === 2){
+    const st = runtime.levelState;
+    if(!st) return null;
+    const c = st.cans[st.active];
+    if(!c) return null;
+    if(!c.opened) return { x: c.x, y: c.y - 90 };
+    if(c.phase === 'opened') return { x: 700, y: 330 };
+    return { x: 640, y: 300 };
+  }
+  if(idx === 3){
+    const st = runtime.levelState;
+    if(!st) return null;
+    return { x: 520, y: 600 };
+  }
+  if(idx === 4){
+    const st = runtime.levelState;
+    if(!st) return null;
+    if(st.phase === 'wash')  return { x: 180, y: 380 };
+    if(st.phase === 'slide') return { x: 720, y: 320 };
+    return { x: 720, y: 316 };
+  }
+  if(idx === 5){
+    const st = runtime.levelState;
+    if(!st) return null;
+    if(!st.bombs.every(b => b.placed)) return { x: 260, y: 430 };
+    return { x: 470, y: 600 };
+  }
+  if(idx === 6){
+    const st = runtime.levelState;
+    if(!st) return null;
+    if(st.phase === 'wait') return { x: 512, y: 150 };
+    return { x: 440, y: 180 };
+  }
+  return null;
+}
+
+/* ============================================================
+   15. UI 绑定
+   ============================================================ */
+function syncMuteBtns(){
+  const html = AUDIO.isMuted() ? SPEAKER_OFF : SPEAKER_ON;
+  els.muteMap.innerHTML = html;  els.muteMap.setAttribute('aria-pressed', String(AUDIO.isMuted()));
+  els.mutePlay.innerHTML = html; els.mutePlay.setAttribute('aria-pressed', String(AUDIO.isMuted()));
+}
+function toggleMute(){
+  AUDIO.unlock();
+  AUDIO.setMuted(!AUDIO.isMuted());
+  Save.data.muted = AUDIO.isMuted();
+  Save.write();
+  syncMuteBtns();
+}
+els.muteMap.addEventListener('click', toggleMute);
+els.mutePlay.addEventListener('click', toggleMute);
+
+$('#btnStart').addEventListener('click', () => {
+  AUDIO.unlock();
+  if(Save.data.muted) AUDIO.setMuted(true);
+  syncMuteBtns();
+  renderMap();
+  show('MAP');
+});
+$('#btnBackMap').addEventListener('click', backToMap);
+$('#btnBackToMap').addEventListener('click', backToMap);
+$('#btnReplay').addEventListener('click', () => {
+  els.result.hidden = true;
+  const i = runtime.levelIndex;
+  startLevel(i);
+});
+/* 第 6 关进入前闪安全提示卡（一次性）。存入存档避免反复弹 */
+function maybeShowSafety(ctx){
+  if(Save.data._safetySeen) return;
+  Save.data._safetySeen = true; Save.write();
+  els.safety.hidden = false;
+}
+$('#btnSafetyOk').addEventListener('click', () => { els.safety.hidden = true; });
+
+/* 重置（长按 1.2 秒保护） */
+$('#btnReset').addEventListener('click', () => { els.doReset.hidden = false; });
+$('#btnResetNo').addEventListener('click', () => { els.doReset.hidden = true; });
+(function holdToReset(){
+  const btn = $('#btnResetYes'), fill = $('.fill', btn);
+  let raf = 0, t0 = 0;
+  const tick = t => {
+    const k = clamp((t - t0) / 1200, 0, 1);
+    fill.style.width = (k * 100) + '%';
+    if(k >= 1){
+      cancelAnimationFrame(raf); raf = 0; fill.style.width = '0%';
+      els.doReset.hidden = true;
+      Save.reset();
+      renderMap();
+      say('已经从头开始');
+      return;
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault(); t0 = performance.now();
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(tick);
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(t =>
+    btn.addEventListener(t, () => { cancelAnimationFrame(raf); raf = 0; fill.style.width = '0%'; }));
+})();
+
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){ stopLoop(); }
+  else if(runtime.screen === 'PLAY' && !runtime.raf){
+    runtime.lastT = performance.now(); runtime.lastTouch = performance.now();
+    loop();
+  }
+});
+
+/* ============================================================
+   16. 启动
+   ============================================================ */
+Save.load();
+AUDIO.setMuted(!!Save.data.muted);
+syncMuteBtns();
+els.titleArt.innerHTML = `${rainbowSVG(150, 258, .55)}
+  <g transform="translate(150 250) scale(1.55)">
+    ${chickSVG('flap', { x:0, y0:0, scale:1 })}
+  </g>
+  <g transform="translate(238 288) rotate(20) scale(.62)">${canSVG()}</g>`;
+show('TITLE');
+
+/* 暴露给冒烟测试的最小钩子 */
+window.__game = {
+  start(){ $('#btnStart').click(); },
+  play(i){ startLevel(i); },
+  state(){ return { screen: runtime.screen, level: runtime.levelIndex,
+                    unlocked: Save.data.highestUnlocked, completed: Save.data.completed.slice(),
+                    levelState: runtime.levelState }; },
+};
+
+})();
+</script>
+</body>
+</html>

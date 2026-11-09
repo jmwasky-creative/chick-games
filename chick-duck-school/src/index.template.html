@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#FFD35C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>小鸭上学记</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <div id="app">
+    <canvas id="cv" width="960" height="640"></canvas>
+
+    <!-- ============ DOM 覆盖层：全部面板结构在此，样式在 style.css ============ -->
+    <div id="ui">
+
+      <!-- —— 标题页 —— -->
+      <section class="screen" id="screen-title">
+        <div class="card-panel">
+          <div class="logo-duck" aria-hidden="true">🐤</div>
+          <h1 class="ttl">小鸭上学记</h1>
+          <p class="sub">睡觉 · 起床 · 上学 · 和大家一起回家</p>
+          <div class="btn-col">
+            <button class="btn btn-primary" id="btn-start">开始上学</button>
+            <button class="btn" id="btn-levels">选关卡</button>
+            <button class="btn" id="btn-gallery">同学图鉴</button>
+            <button class="btn" id="btn-settings">设置</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- —— 关卡选择 —— -->
+      <section class="screen" id="screen-levels">
+        <div class="card-panel">
+          <h2 class="ttl">选一关</h2>
+          <div class="level-grid" id="level-grid"><!-- JS 填充 --></div>
+          <div class="btn-row">
+            <button class="btn" id="btn-lv-back">返回</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- —— 第 5 关「从头跑 / 继续回程」询问 —— -->
+      <section class="screen" id="screen-l5ask">
+        <div class="card-panel">
+          <h2 class="ttl">第 5 关</h2>
+          <p class="sub">上次跑到学校门口啦，要继续跑回家吗？</p>
+          <div class="btn-col">
+            <button class="btn btn-primary" id="btn-l5-fresh">从头跑（推荐）</button>
+            <button class="btn" id="btn-l5-resume">继续回程</button>
+            <button class="btn btn-ghost" id="btn-l5-cancel">先不玩</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- —— 图鉴（8 位） —— -->
+      <section class="screen" id="screen-gallery">
+        <div class="card-panel">
+          <h2 class="ttl">同学图鉴</h2>
+          <div class="gallery-grid" id="gallery-grid"><!-- JS 填充 --></div>
+          <div class="btn-row">
+            <button class="btn" id="btn-gl-back">返回</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- —— 设置 —— -->
+      <section class="screen" id="screen-settings">
+        <div class="card-panel">
+          <h2 class="ttl">设置</h2>
+          <div class="switch-row">
+            <span class="switch-label">🎵 音乐</span>
+            <button class="switch" id="btn-music" role="switch" aria-checked="true"><i></i></button>
+          </div>
+          <div class="switch-row">
+            <span class="switch-label">🔔 音效</span>
+            <button class="switch" id="btn-sfx" role="switch" aria-checked="true"><i></i></button>
+          </div>
+          <div class="stats-box" id="stats-box"><!-- 家长统计 --></div>
+          <div class="btn-col">
+            <button class="btn" id="btn-copy-stats">复制统计数据（JSON）</button>
+            <button class="btn btn-ghost" id="btn-reset-save">清空存档</button>
+            <button class="btn" id="btn-set-back">返回</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- —— 暂停 —— -->
+      <section class="screen" id="screen-pause">
+        <div class="card-panel">
+          <h2 class="ttl">休息一下</h2>
+          <div class="btn-col">
+            <button class="btn btn-primary" id="btn-resume">继续玩</button>
+            <button class="btn" id="btn-retry">重玩本关</button>
+            <button class="btn btn-ghost" id="btn-quit">回主页</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- —— 结算 —— -->
+      <section class="screen" id="screen-result">
+        <div class="card-panel">
+          <h2 class="ttl" id="res-ttl">过关啦！</h2>
+          <div class="stars" id="res-stars"><i></i><i></i><i></i></div>
+          <div class="res-rows" id="res-rows"><!-- 用时/碰撞/相遇 --></div>
+          <p class="sub" id="res-extra"></p>
+          <div class="btn-col">
+            <button class="btn btn-primary" id="btn-next">下一关</button>
+            <button class="btn" id="btn-again">再跑一次</button>
+            <button class="btn btn-ghost" id="btn-home">回主页</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- —— 竖屏旋转引导（首次） —— -->
+      <section class="screen screen-tip" id="screen-rot">
+        <div class="card-panel">
+          <div class="logo-duck" aria-hidden="true">📱</div>
+          <p class="sub">横过来更好玩</p>
+          <div class="btn-row">
+            <button class="btn" id="btn-rot-close">×</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- —— 通用提示条（复制成功等） —— -->
+      <div id="toast"></div>
+    </div>
+  </div>
+</div>
+<script src="js/00-const.js"></script>
+<script src="js/05-save.js"></script>
+<script src="js/10-audio.js"></script>
+<script src="js/20-art.js"></script>
+<script src="js/30-levels.js"></script>
+<script src="js/40-story.js"></script>
+<script src="js/50-physics.js"></script>
+<script src="js/60-game.js"></script>
+<script src="js/70-render.js"></script>
+<script src="js/80-ui.js"></script>
+<script src="js/90-main.js"></script>
+</body>
+</html>
